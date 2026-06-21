@@ -85,18 +85,21 @@
             <!-- Seletor de Provedor de IA -->
             <div class="mb-4">
                 <label class="block text-sm mb-2 text-slate-400">Provedor de IA</label>
-                <div class="flex gap-2">
-                    <button type="button" id="providerOpenai" class="provider-btn flex-1 py-2 px-4 rounded bg-slate-700 hover:bg-slate-600 transition text-sm font-medium">
+                <div class="grid grid-cols-3 gap-2">
+                    <button type="button" id="providerOpenai" class="provider-btn py-2 px-4 rounded bg-slate-700 hover:bg-slate-600 transition text-sm font-medium">
                         OpenAI
                     </button>
-                    <button type="button" id="providerZai" class="provider-btn flex-1 py-2 px-4 rounded bg-slate-700 hover:bg-slate-600 transition text-sm font-medium">
+                    <button type="button" id="providerZai" class="provider-btn py-2 px-4 rounded bg-slate-700 hover:bg-slate-600 transition text-sm font-medium">
                         Z.AI (GLM)
+                    </button>
+                    <button type="button" id="providerFree" class="provider-btn py-2 px-4 rounded bg-emerald-700 hover:bg-emerald-600 transition text-sm font-medium">
+                        Gratuíta
                     </button>
                 </div>
             </div>
 
             <!-- Configurações OpenAI -->
-            <div id="openaiConfig" class="config-section grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div id="openaiConfig" class="config-section grid grid-cols-1 md:grid-cols-3 gap-4 hidden">
                 <div class="md:col-span-1">
                     <label class="block text-sm mb-1 text-slate-400">Endpoint (URL)</label>
                     <input type="text" id="aiEndpoint" placeholder="https://api.openai.com/v1/chat/completions" class="w-full bg-slate-700 p-2 rounded border border-slate-600 text-xs outline-none">
@@ -134,6 +137,13 @@
                 <div class="md:col-span-1">
                     <label class="block text-sm mb-1 text-slate-400">API Key (Z.AI)</label>
                     <input type="password" id="zaiKey" placeholder="ZAI-API-KEY" class="w-full bg-slate-700 p-2 rounded border border-slate-600 text-xs outline-none">
+                </div>
+            </div>
+
+            <!-- Configurações IA Gratuíta -->
+            <div id="freeConfig" class="config-section hidden">
+                <div class="bg-emerald-900/30 border border-emerald-700 text-emerald-300 text-xs p-3 rounded">
+                    🚀 <strong>Modo Gratuíto Ativado:</strong> Usando a API pública Pollinations.ai. Não requer cadastro, chave de API ou cartão de crédito. Pode haver limites de uso ou lentidão em horários de pico.
                 </div>
             </div>
 
@@ -184,14 +194,15 @@
         const zaiEndpoint = document.getElementById('zaiEndpoint');
         const providerOpenai = document.getElementById('providerOpenai');
         const providerZai = document.getElementById('providerZai');
+        const providerFree = document.getElementById('providerFree');
         const openaiConfig = document.getElementById('openaiConfig');
         const zaiConfig = document.getElementById('zaiConfig');
+        const freeConfig = document.getElementById('freeConfig');
         const switchEndpoint = document.getElementById('switchEndpoint');
         const endpointHint = document.getElementById('endpointHint');
 
         // Estado atual
-        let currentProvider = 'openai';
-        let isCodingPlan = false;
+        let currentProvider = 'free'; // Padrão Gratuíto
 
         // Configurações padrão
         const defaultConfigs = {
@@ -203,6 +214,10 @@
                 endpoint: 'https://api.z.ai/api/paas/v4/chat/completions',
                 codingEndpoint: 'https://api.z.ai/api/coding/paas/v4/chat/completions',
                 model: 'glm-5.2'
+            },
+            free: {
+                endpoint: 'https://text.pollinations.ai/openai',
+                model: 'openai' // A API gratuita usa o nome "openai" internamente para rotear
             }
         };
 
@@ -228,7 +243,7 @@
         function loadAIConfig() {
             if(localStorage.getItem('aiConfig')) {
                 const config = JSON.parse(localStorage.getItem('aiConfig'));
-                currentProvider = config.provider || 'openai';
+                currentProvider = config.provider || 'free';
                 
                 aiKey.value = config.openai?.key || '';
                 aiModel.value = config.openai?.model || defaultConfigs.openai.model;
@@ -238,35 +253,44 @@
                 zaiModel.value = config.zai?.model || defaultConfigs.zai.model;
                 zaiEndpoint.value = config.zai?.endpoint || defaultConfigs.zai.endpoint;
                 isCodingPlan = config.zai?.isCodingPlan || false;
-                
-                if (currentProvider === 'zai') {
-                    switchProvider('zai');
-                    if (isCodingPlan) toggleCodingEndpoint();
-                }
             } else {
                 aiEndpoint.value = defaultConfigs.openai.endpoint;
                 aiModel.value = defaultConfigs.openai.model;
                 zaiEndpoint.value = defaultConfigs.zai.endpoint;
                 zaiModel.value = defaultConfigs.zai.model;
             }
+            switchProvider(currentProvider);
         }
 
         function switchProvider(provider) {
             currentProvider = provider;
+            
+            // Esconder tudo
+            openaiConfig.classList.add('hidden');
+            zaiConfig.classList.add('hidden');
+            freeConfig.classList.add('hidden');
+            
+            // Remover destaques
+            providerOpenai.classList.remove('bg-indigo-600');
+            providerOpenai.classList.add('bg-slate-700');
+            providerZai.classList.remove('bg-indigo-600');
+            providerZai.classList.add('bg-slate-700');
+            providerFree.classList.remove('bg-emerald-600');
+            providerFree.classList.add('bg-slate-700');
+            
+            // Mostrar e destacar o selecionado
             if (provider === 'openai') {
                 openaiConfig.classList.remove('hidden');
-                zaiConfig.classList.add('hidden');
                 providerOpenai.classList.add('bg-indigo-600');
                 providerOpenai.classList.remove('bg-slate-700');
-                providerZai.classList.add('bg-slate-700');
-                providerZai.classList.remove('bg-indigo-600');
-            } else {
-                openaiConfig.classList.add('hidden');
+            } else if (provider === 'zai') {
                 zaiConfig.classList.remove('hidden');
                 providerZai.classList.add('bg-indigo-600');
                 providerZai.classList.remove('bg-slate-700');
-                providerOpenai.classList.add('bg-slate-700');
-                providerOpenai.classList.remove('bg-indigo-600');
+            } else if (provider === 'free') {
+                freeConfig.classList.remove('hidden');
+                providerFree.classList.add('bg-emerald-600');
+                providerFree.classList.remove('bg-slate-700');
             }
             saveAIConfig();
         }
@@ -285,7 +309,7 @@
             saveAIConfig();
         }
 
-        // Configuração PWA (Corrigida sem btoa para evitar erro com emojis)
+        // Configuração PWA
         const manifest = {
             name: "MD-Transcritor",
             short_name: "MD-Transcritor",
@@ -381,7 +405,6 @@
             const videoId = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/))([\w-]{11})/)?.[1];
             if (!videoId) throw new Error("URL do YouTube inválida.");
 
-            // Proxy mais robusto
             const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent('https://www.youtube.com/watch?v=' + videoId)}`;
             
             const response = await fetch(proxyUrl);
@@ -417,7 +440,7 @@
 
         // Lógica da IA
         organizeBtn.addEventListener('click', async () => {
-            let currentKey, currentEndpoint, currentModel;
+            let currentKey = '', currentEndpoint = '', currentModel = '';
             
             if (currentProvider === 'openai') {
                 currentKey = aiKey.value;
@@ -427,7 +450,7 @@
                     alert("Por favor, preencha o Endpoint, Modelo e API Key da OpenAI.");
                     return;
                 }
-            } else {
+            } else if (currentProvider === 'zai') {
                 currentKey = zaiKey.value;
                 currentEndpoint = zaiEndpoint.value;
                 currentModel = zaiModel.value;
@@ -435,6 +458,11 @@
                     alert("Por favor, preencha o Endpoint, Modelo e API Key do Z.AI.");
                     return;
                 }
+            } else if (currentProvider === 'free') {
+                currentEndpoint = defaultConfigs.free.endpoint;
+                currentModel = defaultConfigs.free.model;
+                // Chave vazia, mas necessária para o cabeçalho não dar erro em alguns proxies
+                currentKey = 'free'; 
             }
 
             saveAIConfig();
@@ -446,7 +474,6 @@
             try {
                 const shouldTranslate = document.getElementById('translateToggle').checked;
                 
-                // Prompt aprimorado para formatação Markdown estrita
                 let systemPrompt = `Você é um editor de texto especialista em Markdown. Sua tarefa é receber a transcrição bruta de um PDF ou vídeo e formatá-la rigorosamente em Markdown, melhorando a legibilidade sem alterar o sentido original.
 
 Siga estritamente estas regras de formatação:
@@ -466,7 +493,8 @@ Siga estritamente estas regras de formatação:
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
-                        'Authorization': `Bearer ${currentKey}`
+                        // O pollinations.ai ignora a chave, mas não custa enviar
+                        'Authorization': `Bearer ${currentKey}` 
                     },
                     body: JSON.stringify({
                         model: currentModel,
@@ -474,13 +502,17 @@ Siga estritamente estas regras de formatação:
                             { role: "system", content: systemPrompt },
                             { role: "user", content: originalText }
                         ],
-                        temperature: 0.3 // Temperatura baixa para evitar invenções e focar na formatação
+                        temperature: 0.3
                     })
                 });
 
                 if (!response.ok) {
-                    const err = await response.json();
-                    throw new Error(err.error?.message || `Erro HTTP: ${response.status}`);
+                    let errMsg = `Erro HTTP: ${response.status}`;
+                    try {
+                        const err = await response.json();
+                        errMsg = err.error?.message || errMsg;
+                    } catch (_) {}
+                    throw new Error(errMsg);
                 }
 
                 const data = await response.json();
@@ -513,9 +545,9 @@ Siga estritamente estas regras de formatação:
         // Event Listeners
         providerOpenai.addEventListener('click', () => switchProvider('openai'));
         providerZai.addEventListener('click', () => switchProvider('zai'));
+        providerFree.addEventListener('click', () => switchProvider('free'));
         switchEndpoint.addEventListener('click', toggleCodingEndpoint);
 
-        // Salvar configurações dinamicamente quando o usuário digitar e sair do campo (blur) ou alterar seleções (change)
         [aiKey, aiModel, aiEndpoint, zaiKey, zaiEndpoint].forEach(input => {
             input.addEventListener('blur', saveAIConfig);
         });
@@ -523,7 +555,7 @@ Siga estritamente estas regras de formatação:
         zaiModel.addEventListener('change', saveAIConfig);
         document.getElementById('langSelect').addEventListener('change', saveAIConfig);
 
-        // Inicializar carregando o que já existe no LocalStorage
+        // Inicializar
         loadAIConfig();
     </script>
 </body>

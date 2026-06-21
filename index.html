@@ -138,7 +138,7 @@
             </div>
 
             <button id="organizeBtn" class="mt-4 w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-4 rounded transition disabled:opacity-50" disabled>
-                Organizar e Formatar com IA
+                Organizar Formatação Markdown com IA
             </button>
         </section>
 
@@ -241,6 +241,7 @@
                 
                 if (currentProvider === 'zai') {
                     switchProvider('zai');
+                    if (isCodingPlan) toggleCodingEndpoint();
                 }
             } else {
                 aiEndpoint.value = defaultConfigs.openai.endpoint;
@@ -440,12 +441,26 @@
             organizeBtn.classList.add('loading');
             organizeBtn.disabled = true;
             const originalText = outputText.value;
-            outputText.value = "Processando com IA...";
+            outputText.value = "Processando e formatando com IA...";
 
             try {
                 const shouldTranslate = document.getElementById('translateToggle').checked;
-                let systemPrompt = "Você é um assistente especializado em organizar transcrições. Formate o texto em Markdown com títulos, subtítulos e parágrafos. Remova repetições.";
-                if (shouldTranslate) systemPrompt += " Traduza todo o conteúdo para o Português do Brasil.";
+                
+                // Prompt aprimorado para formatação Markdown estrita
+                let systemPrompt = `Você é um editor de texto especialista em Markdown. Sua tarefa é receber a transcrição bruta de um PDF ou vídeo e formatá-la rigorosamente em Markdown, melhorando a legibilidade sem alterar o sentido original.
+
+Siga estritamente estas regras de formatação:
+1. Estrutura: Crie títulos (H1, H2, H3) lógicos para dividir o conteúdo em seções.
+2. Ênfase: Aplique **negrito** para destacar conceitos importantes e *itálico* para ênfases, termos estrangeiros ou títulos de obras.
+3. Citações: Use > (blockquote) para citações diretas, falas de pessoas ou trechos destacados.
+4. Listas: Formate sequências de itens usando listas não ordenadas (-) ou ordenadas (1.).
+5. Notas de Rodapé: Se houver referências numéricas no texto, formate-as usando a sintaxe de notas de rodapé do Markdown (ex: texto[^1] e no final [^1]: Nota...).
+6. Preservação: NÃO reescreva o texto, NÃO resuma. Apenas corrija erros óbvios de transcrição e aplique a formatação visual solicitada.
+7. Limpeza: Remova marcadores de tempo, números de página repetitivos ou ruídos de cabeçalho que poluam a leitura.`;
+
+                if (shouldTranslate) {
+                    systemPrompt += "\n\n8. Idioma: Após formatar, traduza todo o conteúdo resultante para o Português do Brasil, mantendo toda a estrutura Markdown criada.";
+                }
 
                 const response = await fetch(currentEndpoint, {
                     method: 'POST',
@@ -459,7 +474,7 @@
                             { role: "system", content: systemPrompt },
                             { role: "user", content: originalText }
                         ],
-                        temperature: 0.5
+                        temperature: 0.3 // Temperatura baixa para evitar invenções e focar na formatação
                     })
                 });
 
@@ -495,17 +510,21 @@
             URL.revokeObjectURL(url);
         }
 
-        // Event Listeners dos Botões de Provedor
+        // Event Listeners
         providerOpenai.addEventListener('click', () => switchProvider('openai'));
         providerZai.addEventListener('click', () => switchProvider('zai'));
         switchEndpoint.addEventListener('click', toggleCodingEndpoint);
 
-        // Inicializar
+        // Salvar configurações dinamicamente quando o usuário digitar e sair do campo (blur) ou alterar seleções (change)
+        [aiKey, aiModel, aiEndpoint, zaiKey, zaiEndpoint].forEach(input => {
+            input.addEventListener('blur', saveAIConfig);
+        });
+        
+        zaiModel.addEventListener('change', saveAIConfig);
+        document.getElementById('langSelect').addEventListener('change', saveAIConfig);
+
+        // Inicializar carregando o que já existe no LocalStorage
         loadAIConfig();
-        if (currentProvider === 'zai') {
-            switchProvider('zai');
-            if (isCodingPlan) toggleCodingEndpoint();
-        }
     </script>
 </body>
 </html>

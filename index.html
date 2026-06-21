@@ -7,13 +7,13 @@
     <meta name="description" content="Transcritor de PDF e YouTube com IA">
     <meta name="theme-color" content="#0f172a">
     
-    <!-- Manifesto PWA via Blob (Para funcionar em arquivo único) -->
+    <!-- Manifesto PWA via Blob -->
     <link rel="manifest" id="manifest-placeholder">
     
-    <!-- Tailwind CSS para estilização rápida -->
+    <!-- Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     
-    <!-- pdf.js para leitura de PDFs -->
+    <!-- pdf.js -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 
     <style>
@@ -95,7 +95,7 @@
                 </div>
             </div>
 
-            <!-- Configurações Dinâmicas baseadas no Provedor -->
+            <!-- Configurações OpenAI -->
             <div id="openaiConfig" class="config-section grid grid-cols-1 md:grid-cols-3 gap-4">
                 <div class="md:col-span-1">
                     <label class="block text-sm mb-1 text-slate-400">Endpoint (URL)</label>
@@ -111,6 +111,7 @@
                 </div>
             </div>
 
+            <!-- Configurações Z.AI -->
             <div id="zaiConfig" class="config-section grid grid-cols-1 md:grid-cols-3 gap-4 hidden">
                 <div class="md:col-span-1">
                     <label class="block text-sm mb-1 text-slate-400">Endpoint (URL)</label>
@@ -163,7 +164,11 @@
 
     <script>
         // Configuração do PDF.js
-        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        if (window.pdfjsLib) {
+            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+        } else {
+            console.error("PDF.js não carregou. Verifique sua conexão.");
+        }
 
         // Elementos DOM
         const transcribeBtn = document.getElementById('transcribeBtn');
@@ -184,7 +189,7 @@
         const switchEndpoint = document.getElementById('switchEndpoint');
         const endpointHint = document.getElementById('endpointHint');
 
-        // Estado atual do provedor
+        // Estado atual
         let currentProvider = 'openai';
         let isCodingPlan = false;
 
@@ -201,7 +206,7 @@
             }
         };
 
-        // Salvar dados da IA no LocalStorage
+        // Salvar/Carregar Configurações
         function saveAIConfig() {
             const config = {
                 provider: currentProvider,
@@ -220,29 +225,24 @@
             localStorage.setItem('aiConfig', JSON.stringify(config));
         }
 
-        // Carregar configurações salvas
         function loadAIConfig() {
             if(localStorage.getItem('aiConfig')) {
                 const config = JSON.parse(localStorage.getItem('aiConfig'));
                 currentProvider = config.provider || 'openai';
                 
-                // Configurações OpenAI
                 aiKey.value = config.openai?.key || '';
                 aiModel.value = config.openai?.model || defaultConfigs.openai.model;
                 aiEndpoint.value = config.openai?.endpoint || defaultConfigs.openai.endpoint;
                 
-                // Configurações Z.AI
                 zaiKey.value = config.zai?.key || '';
                 zaiModel.value = config.zai?.model || defaultConfigs.zai.model;
                 zaiEndpoint.value = config.zai?.endpoint || defaultConfigs.zai.endpoint;
                 isCodingPlan = config.zai?.isCodingPlan || false;
                 
-                // Atualizar UI
                 if (currentProvider === 'zai') {
                     switchProvider('zai');
                 }
             } else {
-                // Valores padrão
                 aiEndpoint.value = defaultConfigs.openai.endpoint;
                 aiModel.value = defaultConfigs.openai.model;
                 zaiEndpoint.value = defaultConfigs.zai.endpoint;
@@ -250,11 +250,8 @@
             }
         }
 
-        // Alternar entre provedores
         function switchProvider(provider) {
             currentProvider = provider;
-            
-            // Atualizar UI
             if (provider === 'openai') {
                 openaiConfig.classList.remove('hidden');
                 zaiConfig.classList.add('hidden');
@@ -270,15 +267,11 @@
                 providerOpenai.classList.add('bg-slate-700');
                 providerOpenai.classList.remove('bg-indigo-600');
             }
-            
-            // Salvar configuração
             saveAIConfig();
         }
 
-        // Alternar entre endpoint padrão e coding plan
         function toggleCodingEndpoint() {
             isCodingPlan = !isCodingPlan;
-            
             if (isCodingPlan) {
                 zaiEndpoint.value = defaultConfigs.zai.codingEndpoint;
                 endpointHint.textContent = 'Coding Plan: https://api.z.ai/api/coding/paas/v4/chat/completions';
@@ -288,11 +281,10 @@
                 endpointHint.textContent = 'Padrão: https://api.z.ai/api/paas/v4/chat/completions';
                 switchEndpoint.textContent = 'Usar Coding Plan';
             }
-            
             saveAIConfig();
         }
 
-        // Configuração do PWA via Blob (Single File)
+        // Configuração PWA (Corrigida sem btoa para evitar erro com emojis)
         const manifest = {
             name: "MD-Transcritor",
             short_name: "MD-Transcritor",
@@ -300,7 +292,7 @@
             background_color: "#0f172a",
             theme_color: "#0f172a",
             icons: [{
-                src: "data:image/svg+xml;base64," + btoa(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192"><rect width="192" height="192" fill="#0f172a"/><text x="50%" y="50%" font-size="100" text-anchor="middle" dy=".3em" fill="#6366f1">📝</text></svg>`),
+                src: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192"><rect width="192" height="192" fill="#0f172a"/><text x="50%" y="50%" font-size="100" text-anchor="middle" dy=".3em" fill="#6366f1">📝</text></svg>`),
                 sizes: "192x192",
                 type: "image/svg+xml"
             }]
@@ -308,7 +300,7 @@
         const manifestBlob = new Blob([JSON.stringify(manifest)], {type: 'application/json'});
         document.getElementById('manifest-placeholder').setAttribute('href', URL.createObjectURL(manifestBlob));
 
-        // Registro do Service Worker via Blob (Single File)
+        // Service Worker
         const swCode = `
             const CACHE_NAME = 'md-transcritor-cache-v1';
             self.addEventListener('install', e => { self.skipWaiting(); });
@@ -317,7 +309,6 @@
                 e.respondWith(
                     caches.match(e.request).then(response => {
                         return response || fetch(e.request).then(networkResponse => {
-                            // Não cachear PDF.js ou Tailwind para evitar problemas de versão, apenas a própria página
                             if(e.request.method === 'GET' && e.request.url.includes(location.origin)) {
                                 let clone = networkResponse.clone();
                                 caches.open(CACHE_NAME).then(cache => cache.put(e.request, clone));
@@ -335,8 +326,7 @@
             });
         }
 
-        // --- LÓGICA DE TRANSCRIÇÃO ---
-
+        // Lógica de Transcrição
         transcribeBtn.addEventListener('click', async () => {
             const ytUrl = document.getElementById('ytUrl').value;
             const pdfFile = document.getElementById('pdfFile').files[0];
@@ -387,32 +377,29 @@
         }
 
         async function transcribeYouTube(url, lang) {
-            // Extrair o ID do vídeo
             const videoId = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/))([\w-]{11})/)?.[1];
             if (!videoId) throw new Error("URL do YouTube inválida.");
 
-            // Devido ao CORS, precisamos usar um proxy. Este é um proxy público, pode ser instável.
-            // Em produção, recomenda-se um backend próprio.
-            const proxyUrl = `https://corsproxy.io/?https://www.youtube.com/watch?v=${videoId}`;
+            // Proxy mais robusto
+            const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent('https://www.youtube.com/watch?v=' + videoId)}`;
             
             const response = await fetch(proxyUrl);
+            if (!response.ok) throw new Error("Falha ao acessar o vídeo via proxy.");
             const html = await response.text();
             
-            // Regex para encontrar o track de legendas no HTML do YouTube
             const captionRegex = /"captionTracks":(\[.*?\])/;
             const match = html.match(captionRegex);
             
-            if (!match) throw new Error("Não foi possível encontrar legendas para este vídeo (pode estar desativada).");
+            if (!match) throw new Error("Não foi possível encontrar legendas para este vídeo.");
             
             const tracks = JSON.parse(match[1]);
             let selectedTrack = tracks.find(t => t.languageCode.startsWith(lang));
-            if (!selectedTrack) selectedTrack = tracks[0]; // Pega a primeira disponível se a linguagem não for encontrada
+            if (!selectedTrack) selectedTrack = tracks[0];
 
             const xmlUrl = selectedTrack.baseUrl;
-            const xmlResponse = await fetch(`https://corsproxy.io/?${encodeURIComponent(xmlUrl)}`);
+            const xmlResponse = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(xmlUrl)}`);
             const xmlText = await xmlResponse.text();
             
-            // Parser simples de XML de legendas do YT
             const parser = new DOMParser();
             const xmlDoc = parser.parseFromString(xmlText, "text/xml");
             const segments = xmlDoc.getElementsByTagName('text');
@@ -420,7 +407,6 @@
             let text = `# Transcrição do Vídeo: ${videoId}\n\n`;
             for (let seg of segments) {
                 let segText = seg.textContent;
-                // Decodifica entidades HTML básicas
                 segText = segText.replace(/&amp;#39;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
                 text += segText + " ";
             }
@@ -428,17 +414,14 @@
             return text.trim();
         }
 
-        // --- LÓGICA DA IA ---
-
+        // Lógica da IA
         organizeBtn.addEventListener('click', async () => {
             let currentKey, currentEndpoint, currentModel;
             
-            // Obter configurações baseadas no provedor atual
             if (currentProvider === 'openai') {
                 currentKey = aiKey.value;
                 currentEndpoint = aiEndpoint.value;
                 currentModel = aiModel.value;
-                
                 if (!currentKey || !currentEndpoint || !currentModel) {
                     alert("Por favor, preencha o Endpoint, Modelo e API Key da OpenAI.");
                     return;
@@ -447,87 +430,58 @@
                 currentKey = zaiKey.value;
                 currentEndpoint = zaiEndpoint.value;
                 currentModel = zaiModel.value;
-                
                 if (!currentKey || !currentEndpoint || !currentModel) {
                     alert("Por favor, preencha o Endpoint, Modelo e API Key do Z.AI.");
                     return;
                 }
             }
 
-            // Salvar config
             saveAIConfig();
-
             organizeBtn.classList.add('loading');
             organizeBtn.disabled = true;
             const originalText = outputText.value;
-            outputText.value = "Processando com IA... Isso pode levar alguns minutos.";
+            outputText.value = "Processando com IA...";
 
             try {
                 const shouldTranslate = document.getElementById('translateToggle').checked;
-                let systemPrompt = "Você é um assistente especializado em organizar transcrições de texto. Formate o texto a seguir em Markdown bem estruturado, com títulos, subtítulos e parágrafos lógicos. Remova repetições e corrja erros de fala.";
-                
-                if (shouldTranslate) {
-                    systemPrompt += " Além disso, traduza todo o conteúdo organizado para o Português do Brasil.";
-                }
-
-                // Preparar payload para a API
-                const payload = {
-                    model: currentModel,
-                    messages: [
-                        { role: "system", content: systemPrompt },
-                        { role: "user", content: originalText }
-                    ],
-                    temperature: 0.5
-                };
-
-                // Configurar headers
-                const headers = {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${currentKey}`
-                };
-
-                // Adicionar headers específicos do Z.AI se necessário
-                if (currentProvider === 'zai') {
-                    headers['Accept-Language'] = 'en-US,en';
-                }
+                let systemPrompt = "Você é um assistente especializado em organizar transcrições. Formate o texto em Markdown com títulos, subtítulos e parágrafos. Remova repetições.";
+                if (shouldTranslate) systemPrompt += " Traduza todo o conteúdo para o Português do Brasil.";
 
                 const response = await fetch(currentEndpoint, {
                     method: 'POST',
-                    headers: headers,
-                    body: JSON.stringify(payload)
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'Authorization': `Bearer ${currentKey}`
+                    },
+                    body: JSON.stringify({
+                        model: currentModel,
+                        messages: [
+                            { role: "system", content: systemPrompt },
+                            { role: "user", content: originalText }
+                        ],
+                        temperature: 0.5
+                    })
                 });
 
                 if (!response.ok) {
                     const err = await response.json();
-                    throw new Error(err.error?.message || `Erro na API: ${response.status}`);
+                    throw new Error(err.error?.message || `Erro HTTP: ${response.status}`);
                 }
 
                 const data = await response.json();
-                
-                // Verificar estrutura da resposta (compatível com OpenAI)
-                if (data.choices && data.choices[0].message) {
-                    outputText.value = data.choices[0].message.content;
-                } else {
-                    throw new Error("Resposta da API em formato inesperado");
-                }
+                outputText.value = data.choices[0].message.content;
                 
             } catch (error) {
-                outputText.value = "Erro ao organizar com IA: " + error.message + "\n\n--- Texto Original ---\n\n" + originalText;
+                outputText.value = "Erro: " + error.message + "\n\n--- Texto Original ---\n\n" + originalText;
             } finally {
                 organizeBtn.classList.remove('loading');
                 organizeBtn.disabled = false;
             }
         });
 
-        // --- LÓGICA DE DOWNLOAD ---
-
-        downloadTxt.addEventListener('click', () => {
-            downloadFile(outputText.value, 'transcricao.txt', 'text/plain');
-        });
-
-        downloadMd.addEventListener('click', () => {
-            downloadFile(outputText.value, 'transcricao.md', 'text/markdown');
-        });
+        // Downloads
+        downloadTxt.addEventListener('click', () => downloadFile(outputText.value, 'transcricao.txt', 'text/plain'));
+        downloadMd.addEventListener('click', () => downloadFile(outputText.value, 'transcricao.md', 'text/markdown'));
 
         function downloadFile(content, fileName, mimeType) {
             const blob = new Blob([content], { type: mimeType });
@@ -541,29 +495,16 @@
             URL.revokeObjectURL(url);
         }
 
-        // --- EVENT LISTENERS PARA OS BOTÕES DE PROVEDOR ---
-
-        providerOpenai.addEventListener('click', () => {
-            switchProvider('openai');
-        });
-
-        providerZai.addEventListener('click', () => {
-            switchProvider('zai');
-        });
-
-        switchEndpoint.addEventListener('click', () => {
-            toggleCodingEndpoint();
-        });
+        // Event Listeners dos Botões de Provedor
+        providerOpenai.addEventListener('click', () => switchProvider('openai'));
+        providerZai.addEventListener('click', () => switchProvider('zai'));
+        switchEndpoint.addEventListener('click', toggleCodingEndpoint);
 
         // Inicializar
         loadAIConfig();
-        
-        // Atualizar UI baseado no provedor carregado
         if (currentProvider === 'zai') {
             switchProvider('zai');
-            if (isCodingPlan) {
-                toggleCodingEndpoint();
-            }
+            if (isCodingPlan) toggleCodingEndpoint();
         }
     </script>
 </body>

@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MD-Transcritor</title>
+    <meta name="description" content="Transcritor de PDF e YouTube com IA">
+    <meta name="theme-color" content="#0f172a">
+    
+    <!-- Manifesto PWA via Blob (Para funcionar em arquivo único) -->
+    <link rel="manifest" id="manifest-placeholder">
+    
+    <!-- Tailwind CSS para estilização rápida -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    
+    <!-- pdf.js para leitura de PDFs -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
+    <style>
+        body { font-family: 'Inter', sans-serif; }
+        .loading::after {
+            content: ''; display: inline-block; width: 1rem; height: 1rem;
+            border: 2px solid currentColor; border-right-color: transparent;
+            border-radius: 50%; animation: spin 1s linear infinite; margin-left: 0.5rem;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col">
+
+    <header class="bg-slate-800 p-4 shadow-md sticky top-0 z-10">
+        <div class="max-w-4xl mx-auto flex justify-between items-center">
+            <h1 class="text-xl font-bold text-indigo-400">📝 MD-Transcritor</h1>
+            <span class="text-xs text-slate-400 hidden sm:block">PWA Single-File</span>
+        </div>
+    </header>
+
+    <main class="flex-grow max-w-4xl mx-auto w-full p-4 space-y-6">
+        
+        <!-- Seção de Input -->
+        <section class="bg-slate-800 p-6 rounded-lg shadow-lg border border-slate-700">
+            <h2 class="text-lg font-semibold mb-4 text-indigo-300">1. Fonte do Conteúdo</h2>
+            <div class="flex flex-col gap-4">
+                <div>
+                    <label class="block text-sm mb-1 text-slate-400">Link do YouTube</label>
+                    <input type="text" id="ytUrl" placeholder="https://www.youtube.com/watch?v=..." class="w-full bg-slate-700 p-2 rounded border border-slate-600 focus:border-indigo-500 outline-none">
+                </div>
+                <div class="text-center text-slate-500">OU</div>
+                <div>
+                    <label class="block text-sm mb-1 text-slate-400">Carregar PDF</label>
+                    <input type="file" id="pdfFile" accept="application/pdf" class="w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500">
+                </div>
+            </div>
+        </section>
+
+        <!-- Seção de Opções -->
+        <section class="bg-slate-800 p-6 rounded-lg shadow-lg border border-slate-700">
+            <h2 class="text-lg font-semibold mb-4 text-indigo-300">2. Opções de Processamento</h2>
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div>
+                    <label class="block text-sm mb-1 text-slate-400">Linguagem das Legendas (YouTube)</label>
+                    <select id="langSelect" class="w-full bg-slate-700 p-2 rounded border border-slate-600 outline-none">
+                        <option value="pt">Português (pt)</option>
+                        <option value="en">Inglês (en)</option>
+                        <option value="es">Espanhol (es)</option>
+                        <option value="auto">Automático</option>
+                    </select>
+                </div>
+                <div class="flex items-end">
+                    <label class="flex items-center gap-2 text-sm cursor-pointer">
+                        <input type="checkbox" id="translateToggle" class="w-4 h-4 accent-indigo-500">
+                        Traduzir para o Português (Usa IA)
+                    </label>
+                </div>
+            </div>
+            <button id="transcribeBtn" class="mt-4 w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-4 rounded transition disabled:opacity-50">
+                Transcrever Arquivo
+            </button>
+        </section>
+
+        <!-- Seção de IA -->
+        <section class="bg-slate-800 p-6 rounded-lg shadow-lg border border-slate-700">
+            <h2 class="text-lg font-semibold mb-4 text-indigo-300">3. Configuração da IA (Opcional)</h2>
+            
+            <!-- Seletor de Provedor de IA -->
+            <div class="mb-4">
+                <label class="block text-sm mb-2 text-slate-400">Provedor de IA</label>
+                <div class="flex gap-2">
+                    <button type="button" id="providerOpenai" class="provider-btn flex-1 py-2 px-4 rounded bg-slate-700 hover:bg-slate-600 transition text-sm font-medium">
+                        OpenAI
+                    </button>
+                    <button type="button" id="providerZai" class="provider-btn flex-1 py-2 px-4 rounded bg-slate-700 hover:bg-slate-600 transition text-sm font-medium">
+                        Z.AI (GLM)
+                    </button>
+                </div>
+            </div>
+
+            <!-- Configurações Dinâmicas baseadas no Provedor -->
+            <div id="openaiConfig" class="config-section grid grid-cols-1 md:grid-cols-3 gap-4">
+                <div class="md:col-span-1">
+                    <label class="block text-sm mb-1 text-slate-400">Endpoint (URL)</label>
+                    <input type="text" id="aiEndpoint" placeholder="https://api.openai.com/v1/chat/completions" class="w-full bg-slate-700 p-2 rounded border border-slate-600 text-xs outline-none">
+                </div>
+                <div class="md:col-span-1">
+                    <label class="block text-sm mb-1 text-slate-400">Modelo</label>
+                    <input type="text" id="aiModel" placeholder="gpt-3.5-turbo" class="w-full bg-slate-700 p-2 rounded border border-slate-600 text-xs outline-none">
+                </div>
+                <div class="md:col-span-1">
+                    <label class="block text-sm mb-1 text-slate-400">API Key</label>
+                    <input type="password" id="aiKey" placeholder="sk-..." class="w-full bg-slate-700 p-2 rounded border border-slate-600 text-xs outline-none">
+                </div>
+            </div>
+
+            <div id="zaiConfig" class="config-section grid grid-cols-1 md:grid-cols-3 gap-4 hidden">
+                <div class="md:col-span-1">
+                    <label class="block text-sm mb-1 text-slate-400">Endpoint (URL)</label>
+                    <input type="text" id="zaiEndpoint" placeholder="https://api.z.ai/api/paas/v4/chat/completions" class="w-full bg-slate-700 p-2 rounded border border-slate-600 text-xs outline-none">
+                    <div class="text-xs text-slate-500 mt-1">
+                        <span id="endpointHint">Padrão: https://api.z.ai/api/paas/v4/chat/completions</span>
+                        <button type="button" id="switchEndpoint" class="text-indigo-400 hover:text-indigo-300 underline ml-1">
+                            Usar Coding Plan
+                        </button>
+                    </div>
+                </div>
+                <div class="md:col-span-1">
+                    <label class="block text-sm mb-1 text-slate-400">Modelo</label>
+                    <select id="zaiModel" class="w-full bg-slate-700 p-2 rounded border border-slate-600 text-xs outline-none">
+                        <option value="glm-5.2">GLM-5.2 (Padrão)</option>
+                        <option value="glm-4.7">GLM-4.7</option>
+                        <option value="glm-4.6">GLM-4.6</option>
+                    </select>
+                </div>
+                <div class="md:col-span-1">
+                    <label class="block text-sm mb-1 text-slate-400">API Key (Z.AI)</label>
+                    <input type="password" id="zaiKey" placeholder="ZAI-API-KEY" class="w-full bg-slate-700 p-2 rounded border border-slate-600 text-xs outline-none">
+                </div>
+            </div>
+
+            <button id="organizeBtn" class="mt-4 w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-4 rounded transition disabled:opacity-50" disabled>
+                Organizar e Formatar com IA
+            </button>
+        </section>
+
+        <!-- Seção de Output -->
+        <section class="bg-slate-800 p-6 rounded-lg shadow-lg border border-slate-700 flex-grow">
+            <h2 class="text-lg font-semibold mb-4 text-indigo-300">4. Resultado</h2>
+            <textarea id="outputText" class="w-full h-64 bg-slate-900 p-4 rounded border border-slate-600 text-sm outline-none resize-y font-mono" placeholder="O texto transcrito aparecerá aqui..."></textarea>
+            
+            <div class="flex flex-wrap gap-4 mt-4">
+                <button id="downloadTxt" class="flex-1 bg-slate-600 hover:bg-slate-500 text-white font-bold py-2 px-4 rounded transition disabled:opacity-50" disabled>
+                    Baixar .TXT
+                </button>
+                <button id="downloadMd" class="flex-1 bg-slate-600 hover:bg-slate-500 text-white font-bold py-2 px-4 rounded transition disabled:opacity-50" disabled>
+                    Baixar .MD
+                </button>
+            </div>
+        </section>
+    </main>
+
+    <footer class="text-center p-4 text-xs text-slate-500">
+        Execute em localhost ou hospede em um servidor HTTPS para ativar todas as funcionalidades PWA e CORS.
+    </footer>
+
+    <script>
+        // Configuração do PDF.js
+        pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+        // Elementos DOM
+        const transcribeBtn = document.getElementById('transcribeBtn');
+        const organizeBtn = document.getElementById('organizeBtn');
+        const downloadTxt = document.getElementById('downloadTxt');
+        const downloadMd = document.getElementById('downloadMd');
+        const outputText = document.getElementById('outputText');
+        const aiKey = document.getElementById('aiKey');
+        const aiModel = document.getElementById('aiModel');
+        const aiEndpoint = document.getElementById('aiEndpoint');
+        const zaiKey = document.getElementById('zaiKey');
+        const zaiModel = document.getElementById('zaiModel');
+        const zaiEndpoint = document.getElementById('zaiEndpoint');
+        const providerOpenai = document.getElementById('providerOpenai');
+        const providerZai = document.getElementById('providerZai');
+        const openaiConfig = document.getElementById('openaiConfig');
+        const zaiConfig = document.getElementById('zaiConfig');
+        const switchEndpoint = document.getElementById('switchEndpoint');
+        const endpointHint = document.getElementById('endpointHint');
+
+        // Estado atual do provedor
+        let currentProvider = 'openai';
+        let isCodingPlan = false;
+
+        // Configurações padrão
+        const defaultConfigs = {
+            openai: {
+                endpoint: 'https://api.openai.com/v1/chat/completions',
+                model: 'gpt-3.5-turbo'
+            },
+            zai: {
+                endpoint: 'https://api.z.ai/api/paas/v4/chat/completions',
+                codingEndpoint: 'https://api.z.ai/api/coding/paas/v4/chat/completions',
+                model: 'glm-5.2'
+            }
+        };
+
+        // Salvar dados da IA no LocalStorage
+        function saveAIConfig() {
+            const config = {
+                provider: currentProvider,
+                openai: {
+                    key: aiKey.value,
+                    model: aiModel.value,
+                    endpoint: aiEndpoint.value
+                },
+                zai: {
+                    key: zaiKey.value,
+                    model: zaiModel.value,
+                    endpoint: zaiEndpoint.value,
+                    isCodingPlan: isCodingPlan
+                }
+            };
+            localStorage.setItem('aiConfig', JSON.stringify(config));
+        }
+
+        // Carregar configurações salvas
+        function loadAIConfig() {
+            if(localStorage.getItem('aiConfig')) {
+                const config = JSON.parse(localStorage.getItem('aiConfig'));
+                currentProvider = config.provider || 'openai';
+                
+                // Configurações OpenAI
+                aiKey.value = config.openai?.key || '';
+                aiModel.value = config.openai?.model || defaultConfigs.openai.model;
+                aiEndpoint.value = config.openai?.endpoint || defaultConfigs.openai.endpoint;
+                
+                // Configurações Z.AI
+                zaiKey.value = config.zai?.key || '';
+                zaiModel.value = config.zai?.model || defaultConfigs.zai.model;
+                zaiEndpoint.value = config.zai?.endpoint || defaultConfigs.zai.endpoint;
+                isCodingPlan = config.zai?.isCodingPlan || false;
+                
+                // Atualizar UI
+                if (currentProvider === 'zai') {
+                    switchProvider('zai');
+                }
+            } else {
+                // Valores padrão
+                aiEndpoint.value = defaultConfigs.openai.endpoint;
+                aiModel.value = defaultConfigs.openai.model;
+                zaiEndpoint.value = defaultConfigs.zai.endpoint;
+                zaiModel.value = defaultConfigs.zai.model;
+            }
+        }
+
+        // Alternar entre provedores
+        function switchProvider(provider) {
+            currentProvider = provider;
+            
+            // Atualizar UI
+            if (provider === 'openai') {
+                openaiConfig.classList.remove('hidden');
+                zaiConfig.classList.add('hidden');
+                providerOpenai.classList.add('bg-indigo-600');
+                providerOpenai.classList.remove('bg-slate-700');
+                providerZai.classList.add('bg-slate-700');
+                providerZai.classList.remove('bg-indigo-600');
+            } else {
+                openaiConfig.classList.add('hidden');
+                zaiConfig.classList.remove('hidden');
+                providerZai.classList.add('bg-indigo-600');
+                providerZai.classList.remove('bg-slate-700');
+                providerOpenai.classList.add('bg-slate-700');
+                providerOpenai.classList.remove('bg-indigo-600');
+            }
+            
+            // Salvar configuração
+            saveAIConfig();
+        }
+
+        // Alternar entre endpoint padrão e coding plan
+        function toggleCodingEndpoint() {
+            isCodingPlan = !isCodingPlan;
+            
+            if (isCodingPlan) {
+                zaiEndpoint.value = defaultConfigs.zai.codingEndpoint;
+                endpointHint.textContent = 'Coding Plan: https://api.z.ai/api/coding/paas/v4/chat/completions';
+                switchEndpoint.textContent = 'Usar Endpoint Padrão';
+            } else {
+                zaiEndpoint.value = defaultConfigs.zai.endpoint;
+                endpointHint.textContent = 'Padrão: https://api.z.ai/api/paas/v4/chat/completions';
+                switchEndpoint.textContent = 'Usar Coding Plan';
+            }
+            
+            saveAIConfig();
+        }
+
+        // Configuração do PWA via Blob (Single File)
+        const manifest = {
+            name: "MD-Transcritor",
+            short_name: "MD-Transcritor",
+            display: "standalone",
+            background_color: "#0f172a",
+            theme_color: "#0f172a",
+            icons: [{
+                src: "data:image/svg+xml;base64," + btoa(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192"><rect width="192" height="192" fill="#0f172a"/><text x="50%" y="50%" font-size="100" text-anchor="middle" dy=".3em" fill="#6366f1">📝</text></svg>`),
+                sizes: "192x192",
+                type: "image/svg+xml"
+            }]
+        };
+        const manifestBlob = new Blob([JSON.stringify(manifest)], {type: 'application/json'});
+        document.getElementById('manifest-placeholder').setAttribute('href', URL.createObjectURL(manifestBlob));
+
+        // Registro do Service Worker via Blob (Single File)
+        const swCode = `
+            const CACHE_NAME = 'md-transcritor-cache-v1';
+            self.addEventListener('install', e => { self.skipWaiting(); });
+            self.addEventListener('activate', e => { e.waitUntil(self.clients.claim()); });
+            self.addEventListener('fetch', e => {
+                e.respondWith(
+                    caches.match(e.request).then(response => {
+                        return response || fetch(e.request).then(networkResponse => {
+                            // Não cachear PDF.js ou Tailwind para evitar problemas de versão, apenas a própria página
+                            if(e.request.method === 'GET' && e.request.url.includes(location.origin)) {
+                                let clone = networkResponse.clone();
+                                caches.open(CACHE_NAME).then(cache => cache.put(e.request, clone));
+                            }
+                            return networkResponse;
+                        }).catch(() => caches.match('/'));
+                    })
+                );
+            });
+        `;
+        const swBlob = new Blob([swCode], {type: 'application/javascript'});
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(err => console.log('SW falhou:', err));
+            });
+        }
+
+        // --- LÓGICA DE TRANSCRIÇÃO ---
+
+        transcribeBtn.addEventListener('click', async () => {
+            const ytUrl = document.getElementById('ytUrl').value;
+            const pdfFile = document.getElementById('pdfFile').files[0];
+            const lang = document.getElementById('langSelect').value;
+
+            outputText.value = '';
+            transcribeBtn.classList.add('loading');
+            transcribeBtn.disabled = true;
+            organizeBtn.disabled = true;
+            downloadTxt.disabled = true;
+            downloadMd.disabled = true;
+
+            try {
+                if (ytUrl) {
+                    outputText.value = await transcribeYouTube(ytUrl, lang);
+                } else if (pdfFile) {
+                    outputText.value = await transcribePDF(pdfFile);
+                } else {
+                    alert("Por favor, insira um link do YouTube ou selecione um PDF.");
+                    return;
+                }
+
+                if (outputText.value) {
+                    organizeBtn.disabled = false;
+                    downloadTxt.disabled = false;
+                    downloadMd.disabled = false;
+                }
+            } catch (error) {
+                outputText.value = "Erro: " + error.message;
+            } finally {
+                transcribeBtn.classList.remove('loading');
+                transcribeBtn.disabled = false;
+            }
+        });
+
+        async function transcribePDF(file) {
+            const arrayBuffer = await file.arrayBuffer();
+            const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
+            let text = `# Transcrição do PDF: ${file.name}\n\n`;
+            
+            for (let i = 1; i <= pdf.numPages; i++) {
+                const page = await pdf.getPage(i);
+                const content = await page.getTextContent();
+                const pageText = content.items.map(item => item.str).join(' ');
+                text += `## Página ${i}\n${pageText}\n\n`;
+            }
+            return text;
+        }
+
+        async function transcribeYouTube(url, lang) {
+            // Extrair o ID do vídeo
+            const videoId = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/))([\w-]{11})/)?.[1];
+            if (!videoId) throw new Error("URL do YouTube inválida.");
+
+            // Devido ao CORS, precisamos usar um proxy. Este é um proxy público, pode ser instável.
+            // Em produção, recomenda-se um backend próprio.
+            const proxyUrl = `https://corsproxy.io/?https://www.youtube.com/watch?v=${videoId}`;
+            
+            const response = await fetch(proxyUrl);
+            const html = await response.text();
+            
+            // Regex para encontrar o track de legendas no HTML do YouTube
+            const captionRegex = /"captionTracks":(\[.*?\])/;
+            const match = html.match(captionRegex);
+            
+            if (!match) throw new Error("Não foi possível encontrar legendas para este vídeo (pode estar desativada).");
+            
+            const tracks = JSON.parse(match[1]);
+            let selectedTrack = tracks.find(t => t.languageCode.startsWith(lang));
+            if (!selectedTrack) selectedTrack = tracks[0]; // Pega a primeira disponível se a linguagem não for encontrada
+
+            const xmlUrl = selectedTrack.baseUrl;
+            const xmlResponse = await fetch(`https://corsproxy.io/?${encodeURIComponent(xmlUrl)}`);
+            const xmlText = await xmlResponse.text();
+            
+            // Parser simples de XML de legendas do YT
+            const parser = new DOMParser();
+            const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+            const segments = xmlDoc.getElementsByTagName('text');
+            
+            let text = `# Transcrição do Vídeo: ${videoId}\n\n`;
+            for (let seg of segments) {
+                let segText = seg.textContent;
+                // Decodifica entidades HTML básicas
+                segText = segText.replace(/&amp;#39;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+                text += segText + " ";
+            }
+            
+            return text.trim();
+        }
+
+        // --- LÓGICA DA IA ---
+
+        organizeBtn.addEventListener('click', async () => {
+            let currentKey, currentEndpoint, currentModel;
+            
+            // Obter configurações baseadas no provedor atual
+            if (currentProvider === 'openai') {
+                currentKey = aiKey.value;
+                currentEndpoint = aiEndpoint.value;
+                currentModel = aiModel.value;
+                
+                if (!currentKey || !currentEndpoint || !currentModel) {
+                    alert("Por favor, preencha o Endpoint, Modelo e API Key da OpenAI.");
+                    return;
+                }
+            } else {
+                currentKey = zaiKey.value;
+                currentEndpoint = zaiEndpoint.value;
+                currentModel = zaiModel.value;
+                
+                if (!currentKey || !currentEndpoint || !currentModel) {
+                    alert("Por favor, preencha o Endpoint, Modelo e API Key do Z.AI.");
+                    return;
+                }
+            }
+
+            // Salvar config
+            saveAIConfig();
+
+            organizeBtn.classList.add('loading');
+            organizeBtn.disabled = true;
+            const originalText = outputText.value;
+            outputText.value = "Processando com IA... Isso pode levar alguns minutos.";
+
+            try {
+                const shouldTranslate = document.getElementById('translateToggle').checked;
+                let systemPrompt = "Você é um assistente especializado em organizar transcrições de texto. Formate o texto a seguir em Markdown bem estruturado, com títulos, subtítulos e parágrafos lógicos. Remova repetições e corrja erros de fala.";
+                
+                if (shouldTranslate) {
+                    systemPrompt += " Além disso, traduza todo o conteúdo organizado para o Português do Brasil.";
+                }
+
+                // Preparar payload para a API
+                const payload = {
+                    model: currentModel,
+                    messages: [
+                        { role: "system", content: systemPrompt },
+                        { role: "user", content: originalText }
+                    ],
+                    temperature: 0.5
+                };
+
+                // Configurar headers
+                const headers = {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${currentKey}`
+                };
+
+                // Adicionar headers específicos do Z.AI se necessário
+                if (currentProvider === 'zai') {
+                    headers['Accept-Language'] = 'en-US,en';
+                }
+
+                const response = await fetch(currentEndpoint, {
+                    method: 'POST',
+                    headers: headers,
+                    body: JSON.stringify(payload)
+                });
+
+                if (!response.ok) {
+                    const err = await response.json();
+                    throw new Error(err.error?.message || `Erro na API: ${response.status}`);
+                }
+
+                const data = await response.json();
+                
+                // Verificar estrutura da resposta (compatível com OpenAI)
+                if (data.choices && data.choices[0].message) {
+                    outputText.value = data.choices[0].message.content;
+                } else {
+                    throw new Error("Resposta da API em formato inesperado");
+                }
+                
+            } catch (error) {
+                outputText.value = "Erro ao organizar com IA: " + error.message + "\n\n--- Texto Original ---\n\n" + originalText;
+            } finally {
+                organizeBtn.classList.remove('loading');
+                organizeBtn.disabled = false;
+            }
+        });
+
+        // --- LÓGICA DE DOWNLOAD ---
+
+        downloadTxt.addEventListener('click', () => {
+            downloadFile(outputText.value, 'transcricao.txt', 'text/plain');
+        });
+
+        downloadMd.addEventListener('click', () => {
+            downloadFile(outputText.value, 'transcricao.md', 'text/markdown');
+        });
+
+        function downloadFile(content, fileName, mimeType) {
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = fileName;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+
+        // --- EVENT LISTENERS PARA OS BOTÕES DE PROVEDOR ---
+
+        providerOpenai.addEventListener('click', () => {
+            switchProvider('openai');
+        });
+
+        providerZai.addEventListener('click', () => {
+            switchProvider('zai');
+        });
+
+        switchEndpoint.addEventListener('click', () => {
+            toggleCodingEndpoint();
+        });
+
+        // Inicializar
+        loadAIConfig();
+        
+        // Atualizar UI baseado no provedor carregado
+        if (currentProvider === 'zai') {
+            switchProvider('zai');
+            if (isCodingPlan) {
+                toggleCodingEndpoint();
+            }
+        }
+    </script>
+</body>
+</html>

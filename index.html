@@ -92,7 +92,7 @@
                     <button type="button" id="providerZai" class="provider-btn py-2 px-4 rounded bg-slate-700 hover:bg-slate-600 transition text-sm font-medium">
                         Z.AI (GLM)
                     </button>
-                    <button type="button" id="providerFree" class="provider-btn py-2 px-4 rounded bg-emerald-700 hover:bg-emerald-600 transition text-sm font-medium">
+                    <button type="button" id="providerFree" class="provider-btn py-2 px-4 rounded bg-slate-700 hover:bg-slate-600 transition text-sm font-medium">
                         Gratuíta
                     </button>
                 </div>
@@ -176,9 +176,11 @@
         // Configuração do PDF.js
         if (window.pdfjsLib) {
             pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-        } else {
-            console.error("PDF.js não carregou. Verifique sua conexão.");
         }
+
+        // Estado global corrigido
+        let currentProvider = 'free';
+        let isCodingPlan = false; // Corrigido: declaração garantida
 
         // Elementos DOM
         const transcribeBtn = document.getElementById('transcribeBtn');
@@ -201,9 +203,6 @@
         const switchEndpoint = document.getElementById('switchEndpoint');
         const endpointHint = document.getElementById('endpointHint');
 
-        // Estado atual
-        let currentProvider = 'free'; // Padrão Gratuíto
-
         // Configurações padrão
         const defaultConfigs = {
             openai: {
@@ -217,25 +216,15 @@
             },
             free: {
                 endpoint: 'https://text.pollinations.ai/openai',
-                model: 'openai' // A API gratuita usa o nome "openai" internamente para rotear
+                model: 'openai'
             }
         };
 
-        // Salvar/Carregar Configurações
         function saveAIConfig() {
             const config = {
                 provider: currentProvider,
-                openai: {
-                    key: aiKey.value,
-                    model: aiModel.value,
-                    endpoint: aiEndpoint.value
-                },
-                zai: {
-                    key: zaiKey.value,
-                    model: zaiModel.value,
-                    endpoint: zaiEndpoint.value,
-                    isCodingPlan: isCodingPlan
-                }
+                openai: { key: aiKey.value, model: aiModel.value, endpoint: aiEndpoint.value },
+                zai: { key: zaiKey.value, model: zaiModel.value, endpoint: zaiEndpoint.value, isCodingPlan: isCodingPlan }
             };
             localStorage.setItem('aiConfig', JSON.stringify(config));
         }
@@ -264,13 +253,10 @@
 
         function switchProvider(provider) {
             currentProvider = provider;
-            
-            // Esconder tudo
             openaiConfig.classList.add('hidden');
             zaiConfig.classList.add('hidden');
             freeConfig.classList.add('hidden');
             
-            // Remover destaques
             providerOpenai.classList.remove('bg-indigo-600');
             providerOpenai.classList.add('bg-slate-700');
             providerZai.classList.remove('bg-indigo-600');
@@ -278,7 +264,6 @@
             providerFree.classList.remove('bg-emerald-600');
             providerFree.classList.add('bg-slate-700');
             
-            // Mostrar e destacar o selecionado
             if (provider === 'openai') {
                 openaiConfig.classList.remove('hidden');
                 providerOpenai.classList.add('bg-indigo-600');
@@ -299,11 +284,11 @@
             isCodingPlan = !isCodingPlan;
             if (isCodingPlan) {
                 zaiEndpoint.value = defaultConfigs.zai.codingEndpoint;
-                endpointHint.textContent = 'Coding Plan: https://api.z.ai/api/coding/paas/v4/chat/completions';
+                endpointHint.textContent = 'Coding Plan';
                 switchEndpoint.textContent = 'Usar Endpoint Padrão';
             } else {
                 zaiEndpoint.value = defaultConfigs.zai.endpoint;
-                endpointHint.textContent = 'Padrão: https://api.z.ai/api/paas/v4/chat/completions';
+                endpointHint.textContent = 'Padrão';
                 switchEndpoint.textContent = 'Usar Coding Plan';
             }
             saveAIConfig();
@@ -311,44 +296,32 @@
 
         // Configuração PWA
         const manifest = {
-            name: "MD-Transcritor",
-            short_name: "MD-Transcritor",
-            display: "standalone",
-            background_color: "#0f172a",
-            theme_color: "#0f172a",
-            icons: [{
-                src: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192"><rect width="192" height="192" fill="#0f172a"/><text x="50%" y="50%" font-size="100" text-anchor="middle" dy=".3em" fill="#6366f1">📝</text></svg>`),
-                sizes: "192x192",
-                type: "image/svg+xml"
-            }]
+            name: "MD-Transcritor", short_name: "MD-Transcritor", display: "standalone",
+            background_color: "#0f172a", theme_color: "#0f172a",
+            icons: [{ src: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192"><rect width="192" height="192" fill="#0f172a"/><text x="50%" y="50%" font-size="100" text-anchor="middle" dy=".3em" fill="#6366f1">📝</text></svg>`), sizes: "192x192", type: "image/svg+xml" }]
         };
         const manifestBlob = new Blob([JSON.stringify(manifest)], {type: 'application/json'});
         document.getElementById('manifest-placeholder').setAttribute('href', URL.createObjectURL(manifestBlob));
 
-        // Service Worker
         const swCode = `
             const CACHE_NAME = 'md-transcritor-cache-v1';
             self.addEventListener('install', e => { self.skipWaiting(); });
             self.addEventListener('activate', e => { e.waitUntil(self.clients.claim()); });
             self.addEventListener('fetch', e => {
-                e.respondWith(
-                    caches.match(e.request).then(response => {
-                        return response || fetch(e.request).then(networkResponse => {
-                            if(e.request.method === 'GET' && e.request.url.includes(location.origin)) {
-                                let clone = networkResponse.clone();
-                                caches.open(CACHE_NAME).then(cache => cache.put(e.request, clone));
-                            }
-                            return networkResponse;
-                        }).catch(() => caches.match('/'));
-                    })
-                );
+                e.respondWith(caches.match(e.request).then(response => {
+                    return response || fetch(e.request).then(networkResponse => {
+                        if(e.request.method === 'GET' && e.request.url.includes(location.origin)) {
+                            let clone = networkResponse.clone();
+                            caches.open(CACHE_NAME).then(cache => cache.put(e.request, clone));
+                        }
+                        return networkResponse;
+                    }).catch(() => caches.match('/'));
+                }));
             });
         `;
         const swBlob = new Blob([swCode], {type: 'application/javascript'});
         if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => {
-                navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(err => console.log('SW falhou:', err));
-            });
+            window.addEventListener('load', () => navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(err => console.log('SW falhou:', err)));
         }
 
         // Lógica de Transcrição
@@ -365,14 +338,9 @@
             downloadMd.disabled = true;
 
             try {
-                if (ytUrl) {
-                    outputText.value = await transcribeYouTube(ytUrl, lang);
-                } else if (pdfFile) {
-                    outputText.value = await transcribePDF(pdfFile);
-                } else {
-                    alert("Por favor, insira um link do YouTube ou selecione um PDF.");
-                    return;
-                }
+                if (ytUrl) outputText.value = await transcribeYouTube(ytUrl, lang);
+                else if (pdfFile) outputText.value = await transcribePDF(pdfFile);
+                else { alert("Insira um link do YouTube ou selecione um PDF."); return; }
 
                 if (outputText.value) {
                     organizeBtn.disabled = false;
@@ -391,12 +359,10 @@
             const arrayBuffer = await file.arrayBuffer();
             const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
             let text = `# Transcrição do PDF: ${file.name}\n\n`;
-            
             for (let i = 1; i <= pdf.numPages; i++) {
                 const page = await pdf.getPage(i);
                 const content = await page.getTextContent();
-                const pageText = content.items.map(item => item.str).join(' ');
-                text += `## Página ${i}\n${pageText}\n\n`;
+                text += `## Página ${i}\n${content.items.map(item => item.str).join(' ')}\n\n`;
             }
             return text;
         }
@@ -406,102 +372,84 @@
             if (!videoId) throw new Error("URL do YouTube inválida.");
 
             const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent('https://www.youtube.com/watch?v=' + videoId)}`;
-            
             const response = await fetch(proxyUrl);
             if (!response.ok) throw new Error("Falha ao acessar o vídeo via proxy.");
             const html = await response.text();
             
-            const captionRegex = /"captionTracks":(\[.*?\])/;
-            const match = html.match(captionRegex);
-            
-            if (!match) throw new Error("Não foi possível encontrar legendas para este vídeo.");
+            const match = html.match(/"captionTracks":(\[.*?\])/);
+            if (!match) throw new Error("Legendas não encontradas para este vídeo.");
             
             const tracks = JSON.parse(match[1]);
-            let selectedTrack = tracks.find(t => t.languageCode.startsWith(lang));
-            if (!selectedTrack) selectedTrack = tracks[0];
+            let selectedTrack = tracks.find(t => t.languageCode.startsWith(lang)) || tracks[0];
 
-            const xmlUrl = selectedTrack.baseUrl;
-            const xmlResponse = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(xmlUrl)}`);
+            const xmlResponse = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(selectedTrack.baseUrl)}`);
             const xmlText = await xmlResponse.text();
-            
-            const parser = new DOMParser();
-            const xmlDoc = parser.parseFromString(xmlText, "text/xml");
+            const xmlDoc = new DOMParser().parseFromString(xmlText, "text/xml");
             const segments = xmlDoc.getElementsByTagName('text');
             
             let text = `# Transcrição do Vídeo: ${videoId}\n\n`;
             for (let seg of segments) {
-                let segText = seg.textContent;
-                segText = segText.replace(/&amp;#39;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+                let segText = seg.textContent.replace(/&amp;#39;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
                 text += segText + " ";
             }
-            
             return text.trim();
         }
 
-        // Lógica da IA
+        // Lógica da IA Refinada
         organizeBtn.addEventListener('click', async () => {
             let currentKey = '', currentEndpoint = '', currentModel = '';
+            let headers = { 'Content-Type': 'application/json' };
             
             if (currentProvider === 'openai') {
-                currentKey = aiKey.value;
-                currentEndpoint = aiEndpoint.value;
-                currentModel = aiModel.value;
-                if (!currentKey || !currentEndpoint || !currentModel) {
-                    alert("Por favor, preencha o Endpoint, Modelo e API Key da OpenAI.");
-                    return;
-                }
+                currentKey = aiKey.value.trim();
+                currentEndpoint = aiEndpoint.value.trim();
+                currentModel = aiModel.value.trim();
+                if (!currentKey || !currentEndpoint || !currentModel) return alert("Preencha Endpoint, Modelo e API Key da OpenAI.");
+                headers['Authorization'] = `Bearer ${currentKey}`;
             } else if (currentProvider === 'zai') {
-                currentKey = zaiKey.value;
-                currentEndpoint = zaiEndpoint.value;
+                currentKey = zaiKey.value.trim();
+                currentEndpoint = zaiEndpoint.value.trim();
                 currentModel = zaiModel.value;
-                if (!currentKey || !currentEndpoint || !currentModel) {
-                    alert("Por favor, preencha o Endpoint, Modelo e API Key do Z.AI.");
-                    return;
-                }
+                if (!currentKey || !currentEndpoint || !currentModel) return alert("Preencha Endpoint, Modelo e API Key da Z.AI.");
+                headers['Authorization'] = `Bearer ${currentKey}`;
+                headers['Accept-Language'] = 'en-US,en'; // Exigência da API da Z.AI
             } else if (currentProvider === 'free') {
                 currentEndpoint = defaultConfigs.free.endpoint;
                 currentModel = defaultConfigs.free.model;
-                // Chave vazia, mas necessária para o cabeçalho não dar erro em alguns proxies
-                currentKey = 'free'; 
+                // Sem cabeçalho de Authorization para a API gratuita funcionar
             }
 
             saveAIConfig();
             organizeBtn.classList.add('loading');
             organizeBtn.disabled = true;
             const originalText = outputText.value;
-            outputText.value = "Processando e formatando com IA...";
+            outputText.value = "Processando com IA. Aguarde...";
 
             try {
                 const shouldTranslate = document.getElementById('translateToggle').checked;
+                let systemPrompt = `Você é um editor especialista em Markdown. Formate o texto bruto em Markdown bem estruturado (H1, H2, H3), use **negrito** e *itálico*, > blockquotes para citações, listas e formate notas de rodapé com [^1]. Não resuma, apenas formate e corrija erros óbvios.`;
+                if (shouldTranslate) systemPrompt += " Traduza o resultado final para o Português do Brasil.";
+
+                let messagesPayload;
                 
-                let systemPrompt = `Você é um editor de texto especialista em Markdown. Sua tarefa é receber a transcrição bruta de um PDF ou vídeo e formatá-la rigorosamente em Markdown, melhorando a legibilidade sem alterar o sentido original.
-
-Siga estritamente estas regras de formatação:
-1. Estrutura: Crie títulos (H1, H2, H3) lógicos para dividir o conteúdo em seções.
-2. Ênfase: Aplique **negrito** para destacar conceitos importantes e *itálico* para ênfases, termos estrangeiros ou títulos de obras.
-3. Citações: Use > (blockquote) para citações diretas, falas de pessoas ou trechos destacados.
-4. Listas: Formate sequências de itens usando listas não ordenadas (-) ou ordenadas (1.).
-5. Notas de Rodapé: Se houver referências numéricas no texto, formate-as usando a sintaxe de notas de rodapé do Markdown (ex: texto[^1] e no final [^1]: Nota...).
-6. Preservação: NÃO reescreva o texto, NÃO resuma. Apenas corrija erros óbvios de transcrição e aplique a formatação visual solicitada.
-7. Limpeza: Remova marcadores de tempo, números de página repetitivos ou ruídos de cabeçalho que poluam a leitura.`;
-
-                if (shouldTranslate) {
-                    systemPrompt += "\n\n8. Idioma: Após formatar, traduza todo o conteúdo resultante para o Português do Brasil, mantendo toda a estrutura Markdown criada.";
+                // A API gratuita do Pollinations às vezes ignora o role "system"
+                if (currentProvider === 'free') {
+                    messagesPayload = [
+                        { role: "user", content: systemPrompt + "\n\n--- TEXTO ---\n\n" + originalText }
+                    ];
+                } else {
+                    messagesPayload = [
+                        { role: "system", content: systemPrompt },
+                        { role: "user", content: originalText }
+                    ];
                 }
 
                 const response = await fetch(currentEndpoint, {
                     method: 'POST',
-                    headers: {
-                        'Content-Type': 'application/json',
-                        // O pollinations.ai ignora a chave, mas não custa enviar
-                        'Authorization': `Bearer ${currentKey}` 
-                    },
+                    headers: headers,
                     body: JSON.stringify({
                         model: currentModel,
-                        messages: [
-                            { role: "system", content: systemPrompt },
-                            { role: "user", content: originalText }
-                        ],
+                        messages: messagesPayload,
                         temperature: 0.3
                     })
                 });
@@ -510,16 +458,22 @@ Siga estritamente estas regras de formatação:
                     let errMsg = `Erro HTTP: ${response.status}`;
                     try {
                         const err = await response.json();
-                        errMsg = err.error?.message || errMsg;
+                        errMsg = err.error?.message || JSON.stringify(err);
                     } catch (_) {}
                     throw new Error(errMsg);
                 }
 
                 const data = await response.json();
-                outputText.value = data.choices[0].message.content;
+                if (data.choices && data.choices[0] && data.choices[0].message) {
+                    outputText.value = data.choices[0].message.content;
+                } else {
+                    throw new Error("Resposta da IA em formato inesperado.");
+                }
                 
             } catch (error) {
+                console.error("Erro IA:", error);
                 outputText.value = "Erro: " + error.message + "\n\n--- Texto Original ---\n\n" + originalText;
+                alert("Erro ao processar com IA: " + error.message);
             } finally {
                 organizeBtn.classList.remove('loading');
                 organizeBtn.disabled = false;
@@ -534,11 +488,8 @@ Siga estritamente estas regras de formatação:
             const blob = new Blob([content], { type: mimeType });
             const url = URL.createObjectURL(blob);
             const a = document.createElement('a');
-            a.href = url;
-            a.download = fileName;
-            document.body.appendChild(a);
-            a.click();
-            document.body.removeChild(a);
+            a.href = url; a.download = fileName;
+            document.body.appendChild(a); a.click(); document.body.removeChild(a);
             URL.revokeObjectURL(url);
         }
 
@@ -548,14 +499,11 @@ Siga estritamente estas regras de formatação:
         providerFree.addEventListener('click', () => switchProvider('free'));
         switchEndpoint.addEventListener('click', toggleCodingEndpoint);
 
-        [aiKey, aiModel, aiEndpoint, zaiKey, zaiEndpoint].forEach(input => {
-            input.addEventListener('blur', saveAIConfig);
-        });
-        
+        [aiKey, aiModel, aiEndpoint, zaiKey, zaiEndpoint].forEach(input => input.addEventListener('blur', saveAIConfig));
         zaiModel.addEventListener('change', saveAIConfig);
         document.getElementById('langSelect').addEventListener('change', saveAIConfig);
 
-        // Inicializar
+        // Init
         loadAIConfig();
     </script>
 </body>

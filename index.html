@@ -1,510 +1,705 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>MD-Transcritor</title>
-    <meta name="description" content="Transcritor de PDF e YouTube com IA">
-    <meta name="theme-color" content="#0f172a">
-    
-    <!-- Manifesto PWA via Blob -->
-    <link rel="manifest" id="manifest-placeholder">
-    
-    <!-- Tailwind CSS -->
-    <script src="https://cdn.tailwindcss.com"></script>
-    
-    <!-- pdf.js -->
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Escriba — transcrição para Markdown</title>
+<meta name="theme-color" content="#22201c">
+<meta name="description" content="Transcreve PDFs, vídeos do YouTube e páginas da web para Markdown fiel.">
+<link id="manifestLink" rel="manifest" href="">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='14' fill='%2322201c'/%3E%3Cpath d='M28 74 L50 22 L72 74 M36 56 H64' stroke='%23A63D2F' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.min.js"></script>
+<style>
+  :root{
+    --paper:#FAF7F0;
+    --paper-dim:#F1ECE0;
+    --ink:#22201C;
+    --ink-soft:#4A453C;
+    --graphite:#6B6459;
+    --rubric:#A63D2F;
+    --rubric-dark:#832F24;
+    --moss:#46654B;
+    --rule:#DED4B9;
+    --rule-strong:#C9BC98;
+    --shadow: 0 1px 2px rgba(34,32,28,.06), 0 4px 16px rgba(34,32,28,.06);
+    --serif: ui-serif, Georgia, "Times New Roman", serif;
+    --sans: -apple-system, "Segoe UI", system-ui, sans-serif;
+    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Consolas, monospace;
+  }
+  *{box-sizing:border-box;}
+  html,body{margin:0;padding:0;}
+  body{
+    background:var(--paper);
+    color:var(--ink);
+    font-family:var(--sans);
+    -webkit-font-smoothing:antialiased;
+    min-height:100vh;
+  }
+  ::selection{background:#E9C9BE;}
 
-    <style>
-        body { font-family: 'Inter', sans-serif; }
-        .loading::after {
-            content: ''; display: inline-block; width: 1rem; height: 1rem;
-            border: 2px solid currentColor; border-right-color: transparent;
-            border-radius: 50%; animation: spin 1s linear infinite; margin-left: 0.5rem;
-        }
-        @keyframes spin { to { transform: rotate(360deg); } }
-    </style>
+  /* ---------- header ---------- */
+  header.app-header{
+    display:flex;align-items:baseline;justify-content:space-between;
+    padding:22px 20px 16px;
+    border-bottom:1px solid var(--rule);
+    max-width:920px;margin:0 auto;
+  }
+  header.app-header h1{
+    font-family:var(--serif);
+    font-weight:600;
+    font-size:26px;
+    letter-spacing:.2px;
+    margin:0;
+    display:flex;align-items:baseline;gap:10px;
+  }
+  header.app-header h1 .mark{color:var(--rubric);font-style:italic;font-size:.8em;}
+  header.app-header .tag{
+    font-size:12px;color:var(--graphite);letter-spacing:.04em;
+  }
+  button.icon-btn{
+    background:none;border:1px solid var(--rule-strong);
+    color:var(--ink-soft);
+    width:38px;height:38px;border-radius:8px;
+    cursor:pointer;font-size:16px;
+    display:flex;align-items:center;justify-content:center;
+    transition:.15s border-color, .15s background;
+  }
+  button.icon-btn:hover{border-color:var(--rubric);color:var(--rubric);}
+
+  main{max-width:920px;margin:0 auto;padding:20px;}
+
+  /* ---------- tabs ---------- */
+  nav.tabs{display:flex;gap:2px;margin-bottom:18px;border-bottom:1px solid var(--rule);}
+  nav.tabs button{
+    font-family:var(--serif);font-size:15px;
+    background:none;border:none;
+    padding:10px 18px 12px;
+    color:var(--graphite);
+    cursor:pointer;position:relative;top:1px;
+    border-bottom:2px solid transparent;
+  }
+  nav.tabs button.active{color:var(--ink);border-bottom-color:var(--rubric);}
+  nav.tabs button .n{color:var(--rubric);font-style:italic;margin-right:6px;font-size:.85em;}
+
+  section.panel{display:none;}
+  section.panel.active{display:block;}
+
+  .card{
+    background:#fff;border:1px solid var(--rule);border-radius:10px;
+    padding:22px;box-shadow:var(--shadow);
+  }
+  .drop{
+    border:1.5px dashed var(--rule-strong);border-radius:10px;
+    padding:34px 20px;text-align:center;color:var(--graphite);
+    cursor:pointer;transition:.15s border-color,.15s background;
+  }
+  .drop:hover, .drop.drag{border-color:var(--rubric);background:#FBF3EF;}
+  .drop strong{color:var(--ink);font-family:var(--serif);font-size:17px;}
+  .drop small{display:block;margin-top:6px;font-size:12.5px;}
+  input[type=file]{display:none;}
+
+  input[type=url], input[type=text], input[type=password], select, textarea{
+    font-family:var(--sans);font-size:14.5px;
+    padding:11px 12px;border:1px solid var(--rule-strong);border-radius:8px;
+    background:var(--paper);color:var(--ink);width:100%;
+  }
+  input[type=url]:focus, input[type=text]:focus, input[type=password]:focus, select:focus, textarea:focus{
+    outline:2px solid var(--rubric);outline-offset:1px;border-color:var(--rubric);
+  }
+  label.field{display:block;margin-bottom:14px;}
+  label.field span.lbl{display:block;font-size:12.5px;color:var(--graphite);margin-bottom:6px;letter-spacing:.02em;}
+
+  .row{display:flex;gap:10px;}
+  .row > *{flex:1;}
+
+  button.primary{
+    font-family:var(--sans);font-weight:600;font-size:14px;
+    background:var(--rubric);color:#fff;border:none;border-radius:8px;
+    padding:11px 20px;cursor:pointer;
+    transition:.15s background;
+  }
+  button.primary:hover{background:var(--rubric-dark);}
+  button.primary:disabled{background:#C9A79E;cursor:not-allowed;}
+  button.ghost{
+    font-family:var(--sans);font-size:13.5px;
+    background:none;border:1px solid var(--rule-strong);color:var(--ink-soft);
+    border-radius:8px;padding:9px 14px;cursor:pointer;
+  }
+  button.ghost:hover{border-color:var(--ink-soft);}
+
+  .notice{
+    font-size:13px;line-height:1.5;color:var(--ink-soft);
+    background:var(--paper-dim);border-left:3px solid var(--rubric);
+    padding:10px 13px;border-radius:0 6px 6px 0;margin-top:14px;
+  }
+  .notice.block{border-left-color:var(--graphite);}
+
+  /* ---------- progress ---------- */
+  #progressWrap{margin-top:18px;display:none;}
+  #progressWrap.show{display:block;}
+  .progress-line{font-size:13px;color:var(--ink-soft);margin-bottom:8px;font-family:var(--mono);}
+  .bar{height:5px;background:var(--rule);border-radius:3px;overflow:hidden;}
+  .bar > div{height:100%;background:var(--rubric);width:0%;transition:width .3s;}
+
+  /* ---------- output ---------- */
+  #outputWrap{margin-top:26px;display:none;}
+  #outputWrap.show{display:block;}
+  .output-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
+  .output-head h2{font-family:var(--serif);font-size:17px;margin:0;font-weight:600;}
+  .output-actions{display:flex;gap:8px;}
+  .ledger{
+    display:flex;border:1px solid var(--rule);border-radius:10px;overflow:hidden;background:#fff;
+  }
+  .ledger-rule{
+    width:22px;flex-shrink:0;background:repeating-linear-gradient(
+      to bottom, var(--rule) 0 1px, transparent 1px 22px
+    );border-right:1px solid var(--rule);
+  }
+  #preview{
+    flex:1;padding:22px 26px;max-height:62vh;overflow:auto;
+    font-family:var(--serif);font-size:15.5px;line-height:1.7;color:var(--ink);
+  }
+  #preview[data-mode="raw"]{font-family:var(--mono);font-size:13px;white-space:pre-wrap;color:var(--ink-soft);}
+  #preview .pagemark{color:var(--rubric);font-family:var(--mono);font-size:.78em;font-style:normal;vertical-align:2px;}
+  #preview h1,#preview h2,#preview h3{font-family:var(--serif);}
+  #preview table{border-collapse:collapse;width:100%;font-size:14px;}
+  #preview table th, #preview table td{border:1px solid var(--rule-strong);padding:6px 9px;}
+  #preview blockquote{border-left:3px solid var(--rule-strong);margin:0;padding-left:14px;color:var(--ink-soft);}
+  #preview code{background:var(--paper-dim);padding:1px 5px;border-radius:4px;font-family:var(--mono);font-size:.88em;}
+
+  /* ---------- settings modal ---------- */
+  dialog#settingsModal{
+    border:none;border-radius:12px;padding:0;width:min(560px, 92vw);
+    box-shadow:0 12px 40px rgba(0,0,0,.25);
+  }
+  dialog#settingsModal::backdrop{background:rgba(34,32,28,.45);}
+  .modal-inner{padding:24px 26px 26px;}
+  .modal-inner h2{font-family:var(--serif);font-size:19px;margin:0 0 4px;}
+  .modal-inner p.sub{font-size:13px;color:var(--graphite);margin:0 0 20px;}
+  .provider-block{border:1px solid var(--rule);border-radius:9px;padding:16px;margin-bottom:14px;}
+  .provider-block h3{font-family:var(--serif);font-size:15px;margin:0 0 3px;display:flex;align-items:center;gap:8px;}
+  .provider-block .badge{
+    font-size:10.5px;font-weight:600;letter-spacing:.03em;
+    background:var(--moss);color:#fff;padding:2px 7px;border-radius:20px;
+  }
+  .provider-block p.desc{font-size:12.5px;color:var(--graphite);margin:0 0 12px;line-height:1.5;}
+  .modal-foot{display:flex;justify-content:space-between;align-items:center;margin-top:18px;}
+  fieldset{border:none;padding:0;margin:0;}
+
+  footer{max-width:920px;margin:8px auto 60px;padding:0 20px;font-size:12px;color:var(--graphite);line-height:1.6;}
+
+  @media (max-width:640px){
+    .ledger-rule{display:none;}
+    #preview{padding:16px;}
+  }
+</style>
 </head>
-<body class="bg-slate-900 text-slate-100 min-h-screen flex flex-col">
+<body>
 
-    <header class="bg-slate-800 p-4 shadow-md sticky top-0 z-10">
-        <div class="max-w-4xl mx-auto flex justify-between items-center">
-            <h1 class="text-xl font-bold text-indigo-400">📝 MD-Transcritor</h1>
-            <span class="text-xs text-slate-400 hidden sm:block">PWA Single-File</span>
+<header class="app-header">
+  <h1>Escriba<span class="mark">manuscrito → md</span></h1>
+  <button class="icon-btn" id="openSettings" title="Configurações" aria-label="Configurações">⚙</button>
+</header>
+
+<main>
+  <nav class="tabs" role="tablist">
+    <button class="active" data-tab="pdf" role="tab"><span class="n">01</span>PDF</button>
+    <button data-tab="youtube" role="tab"><span class="n">02</span>YouTube</button>
+    <button data-tab="site" role="tab"><span class="n">03</span>Site</button>
+  </nav>
+
+  <!-- PDF -->
+  <section class="panel active" id="panel-pdf">
+    <div class="card">
+      <div class="drop" id="dropZone">
+        <strong>Solte um PDF aqui ou clique para escolher</strong>
+        <small>Transcrição integral, com negrito, itálico, notas de rodapé e número de página entre colchetes.</small>
+        <input type="file" id="pdfInput" accept="application/pdf">
+      </div>
+      <div class="notice" id="pdfProviderNotice"></div>
+    </div>
+  </section>
+
+  <!-- YouTube -->
+  <section class="panel" id="panel-youtube">
+    <div class="card">
+      <label class="field">
+        <span class="lbl">Endereço do vídeo</span>
+        <div class="row">
+          <input type="url" id="ytUrl" placeholder="https://www.youtube.com/watch?v=...">
+          <button class="primary" id="ytGo" style="flex:0 0 auto;">Transcrever</button>
         </div>
-    </header>
+      </label>
+      <div class="notice" id="ytNotice"></div>
+    </div>
+  </section>
 
-    <main class="flex-grow max-w-4xl mx-auto w-full p-4 space-y-6">
-        
-        <!-- Seção de Input -->
-        <section class="bg-slate-800 p-6 rounded-lg shadow-lg border border-slate-700">
-            <h2 class="text-lg font-semibold mb-4 text-indigo-300">1. Fonte do Conteúdo</h2>
-            <div class="flex flex-col gap-4">
-                <div>
-                    <label class="block text-sm mb-1 text-slate-400">Link do YouTube</label>
-                    <input type="text" id="ytUrl" placeholder="https://www.youtube.com/watch?v=..." class="w-full bg-slate-700 p-2 rounded border border-slate-600 focus:border-indigo-500 outline-none">
-                </div>
-                <div class="text-center text-slate-500">OU</div>
-                <div>
-                    <label class="block text-sm mb-1 text-slate-400">Carregar PDF</label>
-                    <input type="file" id="pdfFile" accept="application/pdf" class="w-full text-sm text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-indigo-600 file:text-white hover:file:bg-indigo-500">
-                </div>
-            </div>
-        </section>
+  <!-- Site -->
+  <section class="panel" id="panel-site">
+    <div class="card">
+      <label class="field">
+        <span class="lbl">Endereço da página</span>
+        <div class="row">
+          <input type="url" id="siteUrl" placeholder="https://exemplo.com/artigo">
+          <button class="primary" id="siteGo" style="flex:0 0 auto;">Transcrever</button>
+        </div>
+      </label>
+      <div class="notice" id="siteNotice"></div>
+    </div>
+  </section>
 
-        <!-- Seção de Opções -->
-        <section class="bg-slate-800 p-6 rounded-lg shadow-lg border border-slate-700">
-            <h2 class="text-lg font-semibold mb-4 text-indigo-300">2. Opções de Processamento</h2>
-            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm mb-1 text-slate-400">Linguagem das Legendas (YouTube)</label>
-                    <select id="langSelect" class="w-full bg-slate-700 p-2 rounded border border-slate-600 outline-none">
-                        <option value="pt">Português (pt)</option>
-                        <option value="en">Inglês (en)</option>
-                        <option value="es">Espanhol (es)</option>
-                        <option value="auto">Automático</option>
-                    </select>
-                </div>
-                <div class="flex items-end">
-                    <label class="flex items-center gap-2 text-sm cursor-pointer">
-                        <input type="checkbox" id="translateToggle" class="w-4 h-4 accent-indigo-500">
-                        Traduzir para o Português (Usa IA)
-                    </label>
-                </div>
-            </div>
-            <button id="transcribeBtn" class="mt-4 w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-2 px-4 rounded transition disabled:opacity-50">
-                Transcrever Arquivo
-            </button>
-        </section>
+  <div id="progressWrap">
+    <div class="progress-line" id="progressLine">Processando…</div>
+    <div class="bar"><div id="progressBar"></div></div>
+  </div>
 
-        <!-- Seção de IA -->
-        <section class="bg-slate-800 p-6 rounded-lg shadow-lg border border-slate-700">
-            <h2 class="text-lg font-semibold mb-4 text-indigo-300">3. Configuração da IA (Opcional)</h2>
-            
-            <!-- Seletor de Provedor de IA -->
-            <div class="mb-4">
-                <label class="block text-sm mb-2 text-slate-400">Provedor de IA</label>
-                <div class="grid grid-cols-3 gap-2">
-                    <button type="button" id="providerOpenai" class="provider-btn py-2 px-4 rounded bg-slate-700 hover:bg-slate-600 transition text-sm font-medium">
-                        OpenAI
-                    </button>
-                    <button type="button" id="providerZai" class="provider-btn py-2 px-4 rounded bg-slate-700 hover:bg-slate-600 transition text-sm font-medium">
-                        Z.AI (GLM)
-                    </button>
-                    <button type="button" id="providerFree" class="provider-btn py-2 px-4 rounded bg-slate-700 hover:bg-slate-600 transition text-sm font-medium">
-                        Gratuíta
-                    </button>
-                </div>
-            </div>
+  <div id="outputWrap">
+    <div class="output-head">
+      <h2>Transcrição</h2>
+      <div class="output-actions">
+        <button class="ghost" id="toggleRaw">Ver markdown puro</button>
+        <button class="ghost" id="copyBtn">Copiar</button>
+        <button class="ghost" id="downloadBtn">Baixar .md</button>
+      </div>
+    </div>
+    <div class="ledger">
+      <div class="ledger-rule"></div>
+      <div id="preview" data-mode="rendered"></div>
+    </div>
+  </div>
 
-            <!-- Configurações OpenAI -->
-            <div id="openaiConfig" class="config-section grid grid-cols-1 md:grid-cols-3 gap-4 hidden">
-                <div class="md:col-span-1">
-                    <label class="block text-sm mb-1 text-slate-400">Endpoint (URL)</label>
-                    <input type="text" id="aiEndpoint" placeholder="https://api.openai.com/v1/chat/completions" class="w-full bg-slate-700 p-2 rounded border border-slate-600 text-xs outline-none">
-                </div>
-                <div class="md:col-span-1">
-                    <label class="block text-sm mb-1 text-slate-400">Modelo</label>
-                    <input type="text" id="aiModel" placeholder="gpt-3.5-turbo" class="w-full bg-slate-700 p-2 rounded border border-slate-600 text-xs outline-none">
-                </div>
-                <div class="md:col-span-1">
-                    <label class="block text-sm mb-1 text-slate-400">API Key</label>
-                    <input type="password" id="aiKey" placeholder="sk-..." class="w-full bg-slate-700 p-2 rounded border border-slate-600 text-xs outline-none">
-                </div>
-            </div>
+  <div class="notice" id="globalError" style="display:none;background:#FBF3EF;border-left-color:var(--rubric);"></div>
+</main>
 
-            <!-- Configurações Z.AI -->
-            <div id="zaiConfig" class="config-section grid grid-cols-1 md:grid-cols-3 gap-4 hidden">
-                <div class="md:col-span-1">
-                    <label class="block text-sm mb-1 text-slate-400">Endpoint (URL)</label>
-                    <input type="text" id="zaiEndpoint" placeholder="https://api.z.ai/api/paas/v4/chat/completions" class="w-full bg-slate-700 p-2 rounded border border-slate-600 text-xs outline-none">
-                    <div class="text-xs text-slate-500 mt-1">
-                        <span id="endpointHint">Padrão: https://api.z.ai/api/paas/v4/chat/completions</span>
-                        <button type="button" id="switchEndpoint" class="text-indigo-400 hover:text-indigo-300 underline ml-1">
-                            Usar Coding Plan
-                        </button>
-                    </div>
-                </div>
-                <div class="md:col-span-1">
-                    <label class="block text-sm mb-1 text-slate-400">Modelo</label>
-                    <select id="zaiModel" class="w-full bg-slate-700 p-2 rounded border border-slate-600 text-xs outline-none">
-                        <option value="glm-5.2">GLM-5.2 (Padrão)</option>
-                        <option value="glm-4.7">GLM-4.7</option>
-                        <option value="glm-4.6">GLM-4.6</option>
-                    </select>
-                </div>
-                <div class="md:col-span-1">
-                    <label class="block text-sm mb-1 text-slate-400">API Key (Z.AI)</label>
-                    <input type="password" id="zaiKey" placeholder="ZAI-API-KEY" class="w-full bg-slate-700 p-2 rounded border border-slate-600 text-xs outline-none">
-                </div>
-            </div>
+<footer>
+  Os arquivos e chaves de API ficam só no seu navegador (localStorage). Nada passa por servidor próprio — cada transcrição chama diretamente a API do provedor escolhido.
+</footer>
 
-            <!-- Configurações IA Gratuíta -->
-            <div id="freeConfig" class="config-section hidden">
-                <div class="bg-emerald-900/30 border border-emerald-700 text-emerald-300 text-xs p-3 rounded">
-                    🚀 <strong>Modo Gratuíto Ativado:</strong> Usando a API pública Pollinations.ai. Não requer cadastro, chave de API ou cartão de crédito. Pode haver limites de uso ou lentidão em horários de pico.
-                </div>
-            </div>
+<!-- ---------- settings modal ---------- -->
+<dialog id="settingsModal">
+  <div class="modal-inner">
+    <h2>Configurações</h2>
+    <p class="sub">Escolha o provedor de IA e informe sua própria chave de API. Você pode configurar mais de um.</p>
 
-            <button id="organizeBtn" class="mt-4 w-full bg-emerald-600 hover:bg-emerald-500 text-white font-bold py-2 px-4 rounded transition disabled:opacity-50" disabled>
-                Organizar Formatação Markdown com IA
-            </button>
-        </section>
+    <div class="provider-block">
+      <h3>Google Gemini <span class="badge">tem nível gratuito</span></h3>
+      <p class="desc">Único provedor que lê PDF, vídeo do YouTube e páginas da web de forma nativa (sem bloqueios de CORS). Recomendado como padrão. Chave grátis em aistudio.google.com.</p>
+      <label class="field"><span class="lbl">Chave de API</span><input type="password" id="geminiKey" placeholder="AIza..."></label>
+      <label class="field"><span class="lbl">Modelo</span><input type="text" id="geminiModel" placeholder="gemini-2.5-flash"></label>
+    </div>
 
-        <!-- Seção de Output -->
-        <section class="bg-slate-800 p-6 rounded-lg shadow-lg border border-slate-700 flex-grow">
-            <h2 class="text-lg font-semibold mb-4 text-indigo-300">4. Resultado</h2>
-            <textarea id="outputText" class="w-full h-64 bg-slate-900 p-4 rounded border border-slate-600 text-sm outline-none resize-y font-mono" placeholder="O texto transcrito aparecerá aqui..."></textarea>
-            
-            <div class="flex flex-wrap gap-4 mt-4">
-                <button id="downloadTxt" class="flex-1 bg-slate-600 hover:bg-slate-500 text-white font-bold py-2 px-4 rounded transition disabled:opacity-50" disabled>
-                    Baixar .TXT
-                </button>
-                <button id="downloadMd" class="flex-1 bg-slate-600 hover:bg-slate-500 text-white font-bold py-2 px-4 rounded transition disabled:opacity-50" disabled>
-                    Baixar .MD
-                </button>
-            </div>
-        </section>
-    </main>
+    <div class="provider-block">
+      <h3>Anthropic Claude</h3>
+      <p class="desc">Boa leitura de PDF (inclusive digitalizados). Não busca vídeos do YouTube nem páginas da web por conta própria — use o Gemini para essas duas abas.</p>
+      <label class="field"><span class="lbl">Chave de API</span><input type="password" id="claudeKey" placeholder="sk-ant-..."></label>
+      <label class="field"><span class="lbl">Modelo</span><input type="text" id="claudeModel" placeholder="claude-sonnet-4-6"></label>
+    </div>
 
-    <footer class="text-center p-4 text-xs text-slate-500">
-        Execute em localhost ou hospede em um servidor HTTPS para ativar todas as funcionalidades PWA e CORS.
-    </footer>
+    <div class="provider-block">
+      <h3>Endpoint personalizado</h3>
+      <p class="desc">Qualquer API compatível com o formato de chat da OpenAI (ex.: OpenAI, Groq, OpenRouter). Precisa aceitar imagens (visão) para transcrever PDF.</p>
+      <label class="field"><span class="lbl">URL do endpoint</span><input type="text" id="customEndpoint" placeholder="https://api.openai.com/v1/chat/completions"></label>
+      <label class="field"><span class="lbl">Chave de API</span><input type="password" id="customKey" placeholder="sk-..."></label>
+      <label class="field"><span class="lbl">Modelo</span><input type="text" id="customModel" placeholder="gpt-4o"></label>
+    </div>
 
-    <script>
-        // Configuração do PDF.js
-        if (window.pdfjsLib) {
-            pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
-        }
+    <label class="field">
+      <span class="lbl">Provedor a usar para PDF</span>
+      <select id="pdfProviderSelect">
+        <option value="gemini">Google Gemini</option>
+        <option value="claude">Anthropic Claude</option>
+        <option value="custom">Endpoint personalizado</option>
+      </select>
+    </label>
 
-        // Estado global corrigido
-        let currentProvider = 'free';
-        let isCodingPlan = false; // Corrigido: declaração garantida
+    <div class="modal-foot">
+      <span style="font-size:12px;color:var(--graphite);">Salvo só neste navegador.</span>
+      <div style="display:flex;gap:8px;">
+        <button class="ghost" id="closeSettings">Fechar</button>
+        <button class="primary" id="saveSettings">Salvar</button>
+      </div>
+    </div>
+  </div>
+</dialog>
 
-        // Elementos DOM
-        const transcribeBtn = document.getElementById('transcribeBtn');
-        const organizeBtn = document.getElementById('organizeBtn');
-        const downloadTxt = document.getElementById('downloadTxt');
-        const downloadMd = document.getElementById('downloadMd');
-        const outputText = document.getElementById('outputText');
-        const aiKey = document.getElementById('aiKey');
-        const aiModel = document.getElementById('aiModel');
-        const aiEndpoint = document.getElementById('aiEndpoint');
-        const zaiKey = document.getElementById('zaiKey');
-        const zaiModel = document.getElementById('zaiModel');
-        const zaiEndpoint = document.getElementById('zaiEndpoint');
-        const providerOpenai = document.getElementById('providerOpenai');
-        const providerZai = document.getElementById('providerZai');
-        const providerFree = document.getElementById('providerFree');
-        const openaiConfig = document.getElementById('openaiConfig');
-        const zaiConfig = document.getElementById('zaiConfig');
-        const freeConfig = document.getElementById('freeConfig');
-        const switchEndpoint = document.getElementById('switchEndpoint');
-        const endpointHint = document.getElementById('endpointHint');
+<script>
+/* =========================================================
+   PWA: manifest embutido (data URI) + service worker via Blob
+   ========================================================= */
+(function setupPWA(){
+  const manifest = {
+    name: "Escriba — transcrição para Markdown",
+    short_name: "Escriba",
+    start_url: ".",
+    display: "standalone",
+    background_color: "#FAF7F0",
+    theme_color: "#22201C",
+    icons: [{
+      src: "data:image/svg+xml;base64," + btoa("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='14' fill='#22201c'/><path d='M28 74 L50 22 L72 74 M36 56 H64' stroke='#A63D2F' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>"),
+      sizes: "192x192 512x512",
+      type: "image/svg+xml",
+      purpose: "any"
+    }]
+  };
+  const manifestBlob = new Blob([JSON.stringify(manifest)], {type:"application/manifest+json"});
+  document.getElementById("manifestLink").href = URL.createObjectURL(manifestBlob);
 
-        // Configurações padrão
-        const defaultConfigs = {
-            openai: {
-                endpoint: 'https://api.openai.com/v1/chat/completions',
-                model: 'gpt-3.5-turbo'
-            },
-            zai: {
-                endpoint: 'https://api.z.ai/api/paas/v4/chat/completions',
-                codingEndpoint: 'https://api.z.ai/api/coding/paas/v4/chat/completions',
-                model: 'glm-5.2'
-            },
-            free: {
-                endpoint: 'https://text.pollinations.ai/openai',
-                model: 'openai'
-            }
-        };
+  if ("serviceWorker" in navigator){
+    const swCode = `
+      self.addEventListener('install', e => self.skipWaiting());
+      self.addEventListener('activate', e => self.clients.claim());
+      self.addEventListener('fetch', e => {});
+    `;
+    try{
+      const swBlob = new Blob([swCode], {type:"application/javascript"});
+      navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(()=>{});
+    }catch(e){ /* alguns navegadores bloqueiam SW via blob URL; instalação como PWA pode não ficar disponível nesse caso */ }
+  }
+})();
 
-        function saveAIConfig() {
-            const config = {
-                provider: currentProvider,
-                openai: { key: aiKey.value, model: aiModel.value, endpoint: aiEndpoint.value },
-                zai: { key: zaiKey.value, model: zaiModel.value, endpoint: zaiEndpoint.value, isCodingPlan: isCodingPlan }
-            };
-            localStorage.setItem('aiConfig', JSON.stringify(config));
-        }
+/* =========================================================
+   Configurações (localStorage)
+   ========================================================= */
+const cfg = {
+  load(){
+    return {
+      geminiKey: localStorage.getItem("escriba.geminiKey") || "",
+      geminiModel: localStorage.getItem("escriba.geminiModel") || "gemini-2.5-flash",
+      claudeKey: localStorage.getItem("escriba.claudeKey") || "",
+      claudeModel: localStorage.getItem("escriba.claudeModel") || "claude-sonnet-4-6",
+      customEndpoint: localStorage.getItem("escriba.customEndpoint") || "",
+      customKey: localStorage.getItem("escriba.customKey") || "",
+      customModel: localStorage.getItem("escriba.customModel") || "",
+      pdfProvider: localStorage.getItem("escriba.pdfProvider") || "gemini",
+    };
+  },
+  save(v){
+    localStorage.setItem("escriba.geminiKey", v.geminiKey);
+    localStorage.setItem("escriba.geminiModel", v.geminiModel);
+    localStorage.setItem("escriba.claudeKey", v.claudeKey);
+    localStorage.setItem("escriba.claudeModel", v.claudeModel);
+    localStorage.setItem("escriba.customEndpoint", v.customEndpoint);
+    localStorage.setItem("escriba.customKey", v.customKey);
+    localStorage.setItem("escriba.customModel", v.customModel);
+    localStorage.setItem("escriba.pdfProvider", v.pdfProvider);
+  }
+};
 
-        function loadAIConfig() {
-            if(localStorage.getItem('aiConfig')) {
-                const config = JSON.parse(localStorage.getItem('aiConfig'));
-                currentProvider = config.provider || 'free';
-                
-                aiKey.value = config.openai?.key || '';
-                aiModel.value = config.openai?.model || defaultConfigs.openai.model;
-                aiEndpoint.value = config.openai?.endpoint || defaultConfigs.openai.endpoint;
-                
-                zaiKey.value = config.zai?.key || '';
-                zaiModel.value = config.zai?.model || defaultConfigs.zai.model;
-                zaiEndpoint.value = config.zai?.endpoint || defaultConfigs.zai.endpoint;
-                isCodingPlan = config.zai?.isCodingPlan || false;
-            } else {
-                aiEndpoint.value = defaultConfigs.openai.endpoint;
-                aiModel.value = defaultConfigs.openai.model;
-                zaiEndpoint.value = defaultConfigs.zai.endpoint;
-                zaiModel.value = defaultConfigs.zai.model;
-            }
-            switchProvider(currentProvider);
-        }
+const modal = document.getElementById("settingsModal");
+function fillModalFromStorage(){
+  const v = cfg.load();
+  document.getElementById("geminiKey").value = v.geminiKey;
+  document.getElementById("geminiModel").value = v.geminiModel;
+  document.getElementById("claudeKey").value = v.claudeKey;
+  document.getElementById("claudeModel").value = v.claudeModel;
+  document.getElementById("customEndpoint").value = v.customEndpoint;
+  document.getElementById("customKey").value = v.customKey;
+  document.getElementById("customModel").value = v.customModel;
+  document.getElementById("pdfProviderSelect").value = v.pdfProvider;
+}
+document.getElementById("openSettings").addEventListener("click", ()=>{ fillModalFromStorage(); modal.showModal(); });
+document.getElementById("closeSettings").addEventListener("click", ()=> modal.close());
+document.getElementById("saveSettings").addEventListener("click", ()=>{
+  cfg.save({
+    geminiKey: document.getElementById("geminiKey").value.trim(),
+    geminiModel: document.getElementById("geminiModel").value.trim() || "gemini-2.5-flash",
+    claudeKey: document.getElementById("claudeKey").value.trim(),
+    claudeModel: document.getElementById("claudeModel").value.trim() || "claude-sonnet-4-6",
+    customEndpoint: document.getElementById("customEndpoint").value.trim(),
+    customKey: document.getElementById("customKey").value.trim(),
+    customModel: document.getElementById("customModel").value.trim(),
+    pdfProvider: document.getElementById("pdfProviderSelect").value,
+  });
+  modal.close();
+  refreshNotices();
+});
 
-        function switchProvider(provider) {
-            currentProvider = provider;
-            openaiConfig.classList.add('hidden');
-            zaiConfig.classList.add('hidden');
-            freeConfig.classList.add('hidden');
-            
-            providerOpenai.classList.remove('bg-indigo-600');
-            providerOpenai.classList.add('bg-slate-700');
-            providerZai.classList.remove('bg-indigo-600');
-            providerZai.classList.add('bg-slate-700');
-            providerFree.classList.remove('bg-emerald-600');
-            providerFree.classList.add('bg-slate-700');
-            
-            if (provider === 'openai') {
-                openaiConfig.classList.remove('hidden');
-                providerOpenai.classList.add('bg-indigo-600');
-                providerOpenai.classList.remove('bg-slate-700');
-            } else if (provider === 'zai') {
-                zaiConfig.classList.remove('hidden');
-                providerZai.classList.add('bg-indigo-600');
-                providerZai.classList.remove('bg-slate-700');
-            } else if (provider === 'free') {
-                freeConfig.classList.remove('hidden');
-                providerFree.classList.add('bg-emerald-600');
-                providerFree.classList.remove('bg-slate-700');
-            }
-            saveAIConfig();
-        }
+/* first run: open settings automatically if nothing configured */
+window.addEventListener("load", ()=>{
+  const v = cfg.load();
+  if (!v.geminiKey && !v.claudeKey && !v.customEndpoint){
+    fillModalFromStorage();
+    modal.showModal();
+  }
+  refreshNotices();
+});
 
-        function toggleCodingEndpoint() {
-            isCodingPlan = !isCodingPlan;
-            if (isCodingPlan) {
-                zaiEndpoint.value = defaultConfigs.zai.codingEndpoint;
-                endpointHint.textContent = 'Coding Plan';
-                switchEndpoint.textContent = 'Usar Endpoint Padrão';
-            } else {
-                zaiEndpoint.value = defaultConfigs.zai.endpoint;
-                endpointHint.textContent = 'Padrão';
-                switchEndpoint.textContent = 'Usar Coding Plan';
-            }
-            saveAIConfig();
-        }
+function refreshNotices(){
+  const v = cfg.load();
+  const pdfNotice = document.getElementById("pdfProviderNotice");
+  const provNames = {gemini:"Google Gemini", claude:"Anthropic Claude", custom:"endpoint personalizado"};
+  pdfNotice.textContent = `Provedor atual para PDF: ${provNames[v.pdfProvider]}. Altere em Configurações (⚙).`;
 
-        // Configuração PWA
-        const manifest = {
-            name: "MD-Transcritor", short_name: "MD-Transcritor", display: "standalone",
-            background_color: "#0f172a", theme_color: "#0f172a",
-            icons: [{ src: 'data:image/svg+xml;charset=utf-8,' + encodeURIComponent(`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 192 192"><rect width="192" height="192" fill="#0f172a"/><text x="50%" y="50%" font-size="100" text-anchor="middle" dy=".3em" fill="#6366f1">📝</text></svg>`), sizes: "192x192", type: "image/svg+xml" }]
-        };
-        const manifestBlob = new Blob([JSON.stringify(manifest)], {type: 'application/json'});
-        document.getElementById('manifest-placeholder').setAttribute('href', URL.createObjectURL(manifestBlob));
+  const ytNotice = document.getElementById("ytNotice");
+  const siteNotice = document.getElementById("siteNotice");
+  if (v.geminiKey){
+    ytNotice.textContent = "Usa o Gemini para assistir e transcrever o vídeo, com marcações de tempo entre colchetes.";
+    siteNotice.textContent = "Usa o Gemini para buscar e organizar o conteúdo integral da página.";
+  } else {
+    ytNotice.innerHTML = "Este recurso só funciona com uma chave do <strong>Google Gemini</strong> configurada (é o único provedor que lê vídeos do YouTube nativamente). Abra as Configurações (⚙) e informe a chave.";
+    siteNotice.innerHTML = "Este recurso só funciona com uma chave do <strong>Google Gemini</strong> configurada (é o único provedor com busca de páginas web embutida). Abra as Configurações (⚙) e informe a chave.";
+    ytNotice.parentElement.classList.add("block");
+    siteNotice.parentElement.classList.add("block");
+  }
+}
 
-        const swCode = `
-            const CACHE_NAME = 'md-transcritor-cache-v1';
-            self.addEventListener('install', e => { self.skipWaiting(); });
-            self.addEventListener('activate', e => { e.waitUntil(self.clients.claim()); });
-            self.addEventListener('fetch', e => {
-                e.respondWith(caches.match(e.request).then(response => {
-                    return response || fetch(e.request).then(networkResponse => {
-                        if(e.request.method === 'GET' && e.request.url.includes(location.origin)) {
-                            let clone = networkResponse.clone();
-                            caches.open(CACHE_NAME).then(cache => cache.put(e.request, clone));
-                        }
-                        return networkResponse;
-                    }).catch(() => caches.match('/'));
-                }));
-            });
-        `;
-        const swBlob = new Blob([swCode], {type: 'application/javascript'});
-        if ('serviceWorker' in navigator) {
-            window.addEventListener('load', () => navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(err => console.log('SW falhou:', err)));
-        }
+/* =========================================================
+   Tabs
+   ========================================================= */
+document.querySelectorAll("nav.tabs button").forEach(btn=>{
+  btn.addEventListener("click", ()=>{
+    document.querySelectorAll("nav.tabs button").forEach(b=>b.classList.remove("active"));
+    document.querySelectorAll("section.panel").forEach(p=>p.classList.remove("active"));
+    btn.classList.add("active");
+    document.getElementById("panel-"+btn.dataset.tab).classList.add("active");
+  });
+});
 
-        // Lógica de Transcrição
-        transcribeBtn.addEventListener('click', async () => {
-            const ytUrl = document.getElementById('ytUrl').value;
-            const pdfFile = document.getElementById('pdfFile').files[0];
-            const lang = document.getElementById('langSelect').value;
+/* =========================================================
+   Chamadas às APIs (visão: imagens + texto)
+   images: [{mimeType, base64}]
+   ========================================================= */
+async function callGemini({apiKey, model, prompt, images, useUrlContext, fileUri}){
+  const parts = [{text: prompt}];
+  if (images) images.forEach(img => parts.push({inlineData:{mimeType: img.mimeType, data: img.base64}}));
+  if (fileUri) parts.push({fileData:{fileUri}});
+  const body = { contents:[{parts}] };
+  if (useUrlContext) body.tools = [{url_context:{}}];
+  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
+    method:"POST",
+    headers:{ "Content-Type":"application/json", "x-goog-api-key": apiKey },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) throw new Error("Gemini: " + res.status + " " + (await res.text()).slice(0,300));
+  const data = await res.json();
+  const cand = data.candidates && data.candidates[0];
+  if (!cand) throw new Error("Gemini não retornou conteúdo (possível bloqueio de segurança ou URL inacessível).");
+  return (cand.content.parts || []).map(p=>p.text||"").join("\n");
+}
 
-            outputText.value = '';
-            transcribeBtn.classList.add('loading');
-            transcribeBtn.disabled = true;
-            organizeBtn.disabled = true;
-            downloadTxt.disabled = true;
-            downloadMd.disabled = true;
+async function callClaude({apiKey, model, prompt, images}){
+  const content = [{type:"text", text: prompt}];
+  if (images) images.forEach(img => content.push({type:"image", source:{type:"base64", media_type: img.mimeType, data: img.base64}}));
+  const res = await fetch("https://api.anthropic.com/v1/messages", {
+    method:"POST",
+    headers:{
+      "Content-Type":"application/json",
+      "x-api-key": apiKey,
+      "anthropic-version":"2023-06-01",
+      "anthropic-dangerous-direct-browser-access":"true"
+    },
+    body: JSON.stringify({ model, max_tokens: 8000, messages:[{role:"user", content}] })
+  });
+  if (!res.ok) throw new Error("Claude: " + res.status + " " + (await res.text()).slice(0,300));
+  const data = await res.json();
+  return (data.content||[]).map(b=>b.text||"").join("\n");
+}
 
-            try {
-                if (ytUrl) outputText.value = await transcribeYouTube(ytUrl, lang);
-                else if (pdfFile) outputText.value = await transcribePDF(pdfFile);
-                else { alert("Insira um link do YouTube ou selecione um PDF."); return; }
+async function callCustomOpenAI({endpoint, apiKey, model, prompt, images}){
+  const content = [{type:"text", text: prompt}];
+  if (images) images.forEach(img => content.push({type:"image_url", image_url:{url:`data:${img.mimeType};base64,${img.base64}`}}));
+  const res = await fetch(endpoint, {
+    method:"POST",
+    headers:{ "Content-Type":"application/json", "Authorization":"Bearer " + apiKey },
+    body: JSON.stringify({ model, messages:[{role:"user", content}] })
+  });
+  if (!res.ok) throw new Error("Endpoint personalizado: " + res.status + " " + (await res.text()).slice(0,300));
+  const data = await res.json();
+  return data.choices?.[0]?.message?.content || "";
+}
 
-                if (outputText.value) {
-                    organizeBtn.disabled = false;
-                    downloadTxt.disabled = false;
-                    downloadMd.disabled = false;
-                }
-            } catch (error) {
-                outputText.value = "Erro: " + error.message;
-            } finally {
-                transcribeBtn.classList.remove('loading');
-                transcribeBtn.disabled = false;
-            }
-        });
+async function callProviderVision(provider, {prompt, images}){
+  const v = cfg.load();
+  if (provider === "gemini") return callGemini({apiKey:v.geminiKey, model:v.geminiModel, prompt, images});
+  if (provider === "claude") return callClaude({apiKey:v.claudeKey, model:v.claudeModel, prompt, images});
+  return callCustomOpenAI({endpoint:v.customEndpoint, apiKey:v.customKey, model:v.customModel, prompt, images});
+}
 
-        async function transcribePDF(file) {
-            const arrayBuffer = await file.arrayBuffer();
-            const pdf = await pdfjsLib.getDocument({data: arrayBuffer}).promise;
-            let text = `# Transcrição do PDF: ${file.name}\n\n`;
-            for (let i = 1; i <= pdf.numPages; i++) {
-                const page = await pdf.getPage(i);
-                const content = await page.getTextContent();
-                text += `## Página ${i}\n${content.items.map(item => item.str).join(' ')}\n\n`;
-            }
-            return text;
-        }
+/* =========================================================
+   Progresso / saída
+   ========================================================= */
+const progressWrap = document.getElementById("progressWrap");
+const progressLine = document.getElementById("progressLine");
+const progressBar = document.getElementById("progressBar");
+const outputWrap = document.getElementById("outputWrap");
+const preview = document.getElementById("preview");
+const globalError = document.getElementById("globalError");
 
-        async function transcribeYouTube(url, lang) {
-            const videoId = url.match(/(?:youtu\.be\/|youtube\.com\/(?:watch\?v=|embed\/|v\/))([\w-]{11})/)?.[1];
-            if (!videoId) throw new Error("URL do YouTube inválida.");
+function showError(msg){
+  globalError.style.display = "block";
+  globalError.textContent = msg;
+}
+function clearError(){ globalError.style.display = "none"; }
 
-            const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent('https://www.youtube.com/watch?v=' + videoId)}`;
-            const response = await fetch(proxyUrl);
-            if (!response.ok) throw new Error("Falha ao acessar o vídeo via proxy.");
-            const html = await response.text();
-            
-            const match = html.match(/"captionTracks":(\[.*?\])/);
-            if (!match) throw new Error("Legendas não encontradas para este vídeo.");
-            
-            const tracks = JSON.parse(match[1]);
-            let selectedTrack = tracks.find(t => t.languageCode.startsWith(lang)) || tracks[0];
+function setProgress(text, pct){
+  progressWrap.classList.add("show");
+  progressLine.textContent = text;
+  progressBar.style.width = pct + "%";
+}
+function hideProgress(){ progressWrap.classList.remove("show"); }
 
-            const xmlResponse = await fetch(`https://api.allorigins.win/raw?url=${encodeURIComponent(selectedTrack.baseUrl)}`);
-            const xmlText = await xmlResponse.text();
-            const xmlDoc = new DOMParser().parseFromString(xmlText, "text/xml");
-            const segments = xmlDoc.getElementsByTagName('text');
-            
-            let text = `# Transcrição do Vídeo: ${videoId}\n\n`;
-            for (let seg of segments) {
-                let segText = seg.textContent.replace(/&amp;#39;/g, "'").replace(/&quot;/g, '"').replace(/&amp;/g, '&').replace(/&lt;/g, '<').replace(/&gt;/g, '>');
-                text += segText + " ";
-            }
-            return text.trim();
-        }
+let fullMarkdown = "";
+function renderOutput(){
+  outputWrap.classList.add("show");
+  if (preview.dataset.mode === "raw"){
+    preview.textContent = fullMarkdown;
+  } else {
+    const escaped = fullMarkdown.replace(/\[(\d+)\]/g, '<span class="pagemark">[$1]</span>');
+    preview.innerHTML = marked.parse(escaped);
+  }
+}
+document.getElementById("toggleRaw").addEventListener("click", (e)=>{
+  preview.dataset.mode = preview.dataset.mode === "raw" ? "rendered" : "raw";
+  e.target.textContent = preview.dataset.mode === "raw" ? "Ver renderizado" : "Ver markdown puro";
+  renderOutput();
+});
+document.getElementById("copyBtn").addEventListener("click", async ()=>{
+  await navigator.clipboard.writeText(fullMarkdown);
+  const b = document.getElementById("copyBtn");
+  const old = b.textContent; b.textContent = "Copiado!"; setTimeout(()=>b.textContent=old, 1400);
+});
+document.getElementById("downloadBtn").addEventListener("click", ()=>{
+  const blob = new Blob([fullMarkdown], {type:"text/markdown"});
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(blob);
+  a.download = (window.__escribaFileName || "transcricao") + ".md";
+  a.click();
+});
 
-        // Lógica da IA Refinada
-        organizeBtn.addEventListener('click', async () => {
-            let currentKey = '', currentEndpoint = '', currentModel = '';
-            let headers = { 'Content-Type': 'application/json' };
-            
-            if (currentProvider === 'openai') {
-                currentKey = aiKey.value.trim();
-                currentEndpoint = aiEndpoint.value.trim();
-                currentModel = aiModel.value.trim();
-                if (!currentKey || !currentEndpoint || !currentModel) return alert("Preencha Endpoint, Modelo e API Key da OpenAI.");
-                headers['Authorization'] = `Bearer ${currentKey}`;
-            } else if (currentProvider === 'zai') {
-                currentKey = zaiKey.value.trim();
-                currentEndpoint = zaiEndpoint.value.trim();
-                currentModel = zaiModel.value;
-                if (!currentKey || !currentEndpoint || !currentModel) return alert("Preencha Endpoint, Modelo e API Key da Z.AI.");
-                headers['Authorization'] = `Bearer ${currentKey}`;
-                headers['Accept-Language'] = 'en-US,en'; // Exigência da API da Z.AI
-            } else if (currentProvider === 'free') {
-                currentEndpoint = defaultConfigs.free.endpoint;
-                currentModel = defaultConfigs.free.model;
-                // Sem cabeçalho de Authorization para a API gratuita funcionar
-            }
+/* =========================================================
+   PDF: renderizar páginas em imagens e enviar em lotes
+   ========================================================= */
+pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/4.4.168/pdf.worker.min.js";
 
-            saveAIConfig();
-            organizeBtn.classList.add('loading');
-            organizeBtn.disabled = true;
-            const originalText = outputText.value;
-            outputText.value = "Processando com IA. Aguarde...";
+const BATCH_SIZE = 6;      // páginas por chamada de API
+const MAX_DIM = 1600;      // maior lado da imagem renderizada, em px
 
-            try {
-                const shouldTranslate = document.getElementById('translateToggle').checked;
-                let systemPrompt = `Você é um editor especialista em Markdown. Formate o texto bruto em Markdown bem estruturado (H1, H2, H3), use **negrito** e *itálico*, > blockquotes para citações, listas e formate notas de rodapé com [^1]. Não resuma, apenas formate e corrija erros óbvios.`;
-                if (shouldTranslate) systemPrompt += " Traduza o resultado final para o Português do Brasil.";
+async function renderPageToImage(pdf, pageNum){
+  const page = await pdf.getPage(pageNum);
+  const viewport1 = page.getViewport({scale:1});
+  const scale = MAX_DIM / Math.max(viewport1.width, viewport1.height);
+  const viewport = page.getViewport({scale});
+  const canvas = document.createElement("canvas");
+  canvas.width = viewport.width; canvas.height = viewport.height;
+  const ctx = canvas.getContext("2d");
+  await page.render({canvasContext: ctx, viewport}).promise;
+  const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
+  return dataUrl.split(",")[1];
+}
 
-                let messagesPayload;
-                
-                // A API gratuita do Pollinations às vezes ignora o role "system"
-                if (currentProvider === 'free') {
-                    messagesPayload = [
-                        { role: "user", content: systemPrompt + "\n\n--- TEXTO ---\n\n" + originalText }
-                    ];
-                } else {
-                    messagesPayload = [
-                        { role: "system", content: systemPrompt },
-                        { role: "user", content: originalText }
-                    ];
-                }
+function buildPdfPrompt(pageNumbers){
+  return `Transcreva integralmente o conteúdo destas páginas de um PDF para Markdown, na ordem em que aparecem. `+
+  `Preserve toda a formatação: negrito, itálico, títulos e subtítulos, listas, tabelas e citações. `+
+  `Notas de rodapé devem virar notas de rodapé em Markdown (ex.: um trecho com nota[^1] e, ao final do conteúdo da respectiva página, a definição "[^1]: texto da nota"). `+
+  `Insira o número de cada página entre colchetes (ex.: [12]) no meio do fluxo natural do texto, exatamente no ponto em que a página muda — nunca como título isolado nem quebrando uma palavra. `+
+  `As páginas enviadas nesta leva correspondem, nesta ordem, aos números: ${pageNumbers.join(", ")}. `+
+  `Não adicione comentários, introduções ou observações suas: responda apenas com o markdown transcrito, começando já no conteúdo.`;
+}
 
-                const response = await fetch(currentEndpoint, {
-                    method: 'POST',
-                    headers: headers,
-                    body: JSON.stringify({
-                        model: currentModel,
-                        messages: messagesPayload,
-                        temperature: 0.3
-                    })
-                });
+async function processPdfFile(file){
+  clearError(); fullMarkdown = ""; window.__escribaFileName = file.name.replace(/\.pdf$/i,"");
+  const v = cfg.load();
+  const provider = v.pdfProvider;
+  if ((provider==="gemini" && !v.geminiKey) || (provider==="claude" && !v.claudeKey) || (provider==="custom" && !v.customEndpoint)){
+    showError("Configure a chave do provedor selecionado para PDF em Configurações (⚙) antes de transcrever.");
+    return;
+  }
+  try{
+    const arrayBuf = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({data: arrayBuf}).promise;
+    const total = pdf.numPages;
+    let done = 0;
+    setProgress(`Lendo ${total} página(s)…`, 2);
 
-                if (!response.ok) {
-                    let errMsg = `Erro HTTP: ${response.status}`;
-                    try {
-                        const err = await response.json();
-                        errMsg = err.error?.message || JSON.stringify(err);
-                    } catch (_) {}
-                    throw new Error(errMsg);
-                }
+    for (let start = 1; start <= total; start += BATCH_SIZE){
+      const end = Math.min(start + BATCH_SIZE - 1, total);
+      const pageNumbers = [];
+      const images = [];
+      for (let p = start; p <= end; p++){
+        const b64 = await renderPageToImage(pdf, p);
+        images.push({mimeType:"image/jpeg", base64:b64});
+        pageNumbers.push(p);
+      }
+      setProgress(`Transcrevendo páginas ${start}–${end} de ${total}…`, Math.round((start/total)*100));
+      const prompt = buildPdfPrompt(pageNumbers);
+      const chunkMd = await callProviderVision(provider, {prompt, images});
+      fullMarkdown += (fullMarkdown ? "\n\n" : "") + chunkMd.trim();
+      done = end;
+      setProgress(`Transcrevendo páginas ${start}–${end} de ${total}…`, Math.round((done/total)*100));
+      renderOutput();
+    }
+    setProgress(`Concluído — ${total} página(s).`, 100);
+    setTimeout(hideProgress, 1500);
+  }catch(err){
+    hideProgress();
+    showError("Falha na transcrição do PDF: " + err.message);
+  }
+}
 
-                const data = await response.json();
-                if (data.choices && data.choices[0] && data.choices[0].message) {
-                    outputText.value = data.choices[0].message.content;
-                } else {
-                    throw new Error("Resposta da IA em formato inesperado.");
-                }
-                
-            } catch (error) {
-                console.error("Erro IA:", error);
-                outputText.value = "Erro: " + error.message + "\n\n--- Texto Original ---\n\n" + originalText;
-                alert("Erro ao processar com IA: " + error.message);
-            } finally {
-                organizeBtn.classList.remove('loading');
-                organizeBtn.disabled = false;
-            }
-        });
+const dropZone = document.getElementById("dropZone");
+const pdfInput = document.getElementById("pdfInput");
+dropZone.addEventListener("click", ()=> pdfInput.click());
+pdfInput.addEventListener("change", ()=>{ if (pdfInput.files[0]) processPdfFile(pdfInput.files[0]); });
+["dragenter","dragover"].forEach(evt=> dropZone.addEventListener(evt, e=>{ e.preventDefault(); dropZone.classList.add("drag"); }));
+["dragleave","drop"].forEach(evt=> dropZone.addEventListener(evt, e=>{ e.preventDefault(); dropZone.classList.remove("drag"); }));
+dropZone.addEventListener("drop", e=>{
+  const f = e.dataTransfer.files[0];
+  if (f && f.type === "application/pdf") processPdfFile(f);
+  else showError("Solte um arquivo .pdf válido.");
+});
 
-        // Downloads
-        downloadTxt.addEventListener('click', () => downloadFile(outputText.value, 'transcricao.txt', 'text/plain'));
-        downloadMd.addEventListener('click', () => downloadFile(outputText.value, 'transcricao.md', 'text/markdown'));
+/* =========================================================
+   YouTube (somente Gemini — entende a URL nativamente)
+   ========================================================= */
+document.getElementById("ytGo").addEventListener("click", async ()=>{
+  clearError(); fullMarkdown = "";
+  const url = document.getElementById("ytUrl").value.trim();
+  const v = cfg.load();
+  window.__escribaFileName = "youtube-transcricao";
+  if (!url){ showError("Informe o endereço do vídeo."); return; }
+  if (!v.geminiKey){ showError("Configure a chave do Gemini em Configurações (⚙) para usar este recurso."); return; }
+  try{
+    setProgress("Assistindo e transcrevendo o vídeo…", 30);
+    const prompt = `Assista a este vídeo do YouTube e transcreva a fala/conteúdo de forma integral e organizada em Markdown, com títulos por tema quando fizer sentido. `+
+      `Preserve ênfases relevantes (negrito/itálico) quando perceptíveis. Insira marcações de tempo aproximadas entre colchetes (ex.: [12:34]) no fluxo natural do texto, no início de cada novo bloco de assunto. `+
+      `Não adicione comentários seus: responda apenas com o conteúdo transcrito.`;
+    const md = await callGemini({apiKey:v.geminiKey, model:v.geminiModel, prompt, fileUri:url});
+    fullMarkdown = md.trim();
+    renderOutput();
+    setProgress("Concluído.", 100);
+    setTimeout(hideProgress, 1200);
+  }catch(err){
+    hideProgress();
+    showError("Falha ao transcrever o vídeo: " + err.message);
+  }
+});
 
-        function downloadFile(content, fileName, mimeType) {
-            const blob = new Blob([content], { type: mimeType });
-            const url = URL.createObjectURL(blob);
-            const a = document.createElement('a');
-            a.href = url; a.download = fileName;
-            document.body.appendChild(a); a.click(); document.body.removeChild(a);
-            URL.revokeObjectURL(url);
-        }
-
-        // Event Listeners
-        providerOpenai.addEventListener('click', () => switchProvider('openai'));
-        providerZai.addEventListener('click', () => switchProvider('zai'));
-        providerFree.addEventListener('click', () => switchProvider('free'));
-        switchEndpoint.addEventListener('click', toggleCodingEndpoint);
-
-        [aiKey, aiModel, aiEndpoint, zaiKey, zaiEndpoint].forEach(input => input.addEventListener('blur', saveAIConfig));
-        zaiModel.addEventListener('change', saveAIConfig);
-        document.getElementById('langSelect').addEventListener('change', saveAIConfig);
-
-        // Init
-        loadAIConfig();
-    </script>
+/* =========================================================
+   Site (somente Gemini — url_context faz a busca no servidor)
+   ========================================================= */
+document.getElementById("siteGo").addEventListener("click", async ()=>{
+  clearError(); fullMarkdown = "";
+  const url = document.getElementById("siteUrl").value.trim();
+  const v = cfg.load();
+  window.__escribaFileName = "site-transcricao";
+  if (!url){ showError("Informe o endereço da página."); return; }
+  if (!v.geminiKey){ showError("Configure a chave do Gemini em Configurações (⚙) para usar este recurso."); return; }
+  try{
+    setProgress("Buscando e organizando o conteúdo da página…", 30);
+    const prompt = `Acesse o conteúdo da URL ${url} e transcreva/organize o texto integral da página em Markdown, preservando a estrutura original: títulos, listas, tabelas, citações e ênfases (negrito/itálico). `+
+      `Ignore menus de navegação, propaganda e rodapés de site não relacionados ao conteúdo principal. `+
+      `Não adicione comentários seus: responda apenas com o conteúdo organizado.`;
+    const md = await callGemini({apiKey:v.geminiKey, model:v.geminiModel, prompt, useUrlContext:true});
+    fullMarkdown = md.trim();
+    renderOutput();
+    setProgress("Concluído.", 100);
+    setTimeout(hideProgress, 1200);
+  }catch(err){
+    hideProgress();
+    showError("Falha ao transcrever a página: " + err.message);
+  }
+});
+</script>
 </body>
 </html>

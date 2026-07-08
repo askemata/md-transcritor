@@ -458,19 +458,30 @@ document.querySelectorAll("nav.tabs button").forEach(btn=>{
 
 /* =========================================================
    Chamadas às APIs (visão: imagens + texto)
-   images: [{mimeType, base64}]
+   Aceita `parts`: [{type:'text',text} | {type:'image',mimeType,base64}], em ordem —
+   usado no modo híbrido de PDF para intercalar texto nativo + imagem por página.
+   Também aceita a forma antiga (prompt + images) para os fluxos de YouTube/site.
    ========================================================= */
-async function callGemini({apiKey, model, prompt, images, useUrlContext, fileUri, videoRange, lowRes, maxOutputTokens}){
-  const parts = [{text: prompt}];
-  if (images) images.forEach(img => parts.push({inlineData:{mimeType: img.mimeType, data: img.base64}}));
+function buildOrderedParts(prompt, images, parts){
+  if (parts) return parts;
+  const out = [{type:"text", text: prompt}];
+  if (images) images.forEach(img => out.push({type:"image", mimeType: img.mimeType, base64: img.base64}));
+  return out;
+}
+
+async function callGemini({apiKey, model, prompt, images, parts, useUrlContext, fileUri, videoRange, lowRes, maxOutputTokens}){
+  const ordered = buildOrderedParts(prompt, images, parts);
+  const geminiParts = ordered.map(p => p.type === "image"
+    ? {inlineData:{mimeType: p.mimeType, data: p.base64}}
+    : {text: p.text});
   if (fileUri){
     const videoPart = {fileData:{fileUri}};
     if (videoRange) videoPart.videoMetadata = { startOffset:{seconds: videoRange.startSec}, endOffset:{seconds: videoRange.endSec} };
-    parts.push(videoPart);
+    geminiParts.push(videoPart);
   }
   const generationConfig = { maxOutputTokens: maxOutputTokens || 8192 };
   if (lowRes) generationConfig.mediaResolution = "MEDIA_RESOLUTION_LOW";
-  const body = { contents:[{parts}], generationConfig };
+  const body = { contents:[{parts: geminiParts}], generationConfig };
   if (useUrlContext) body.tools = [{url_context:{}}];
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
     method:"POST",
@@ -499,9 +510,11 @@ async function callGemini({apiKey, model, prompt, images, useUrlContext, fileUri
   return cand.content.parts.map(p=>p.text||"").join("\n");
 }
 
-async function callClaude({apiKey, model, prompt, images}){
-  const content = [{type:"text", text: prompt}];
-  if (images) images.forEach(img => content.push({type:"image", source:{type:"base64", media_type: img.mimeType, data: img.base64}}));
+async function callClaude({apiKey, model, prompt, images, parts}){
+  const ordered = buildOrderedParts(prompt, images, parts);
+  const content = ordered.map(p => p.type === "image"
+    ? {type:"image", source:{type:"base64", media_type: p.mimeType, data: p.base64}}
+    : {type:"text", text: p.text});
   const res = await fetch("https://api.anthropic.com/v1/messages", {
     method:"POST",
     headers:{
@@ -517,9 +530,11 @@ async function callClaude({apiKey, model, prompt, images}){
   return (data.content||[]).map(b=>b.text||"").join("\n");
 }
 
-async function callCustomOpenAI({endpoint, apiKey, model, prompt, images}){
-  const content = [{type:"text", text: prompt}];
-  if (images) images.forEach(img => content.push({type:"image_url", image_url:{url:`data:${img.mimeType};base64,${img.base64}`}}));
+async function callCustomOpenAI({endpoint, apiKey, model, prompt, images, parts}){
+  const ordered = buildOrderedParts(prompt, images, parts);
+  const content = ordered.map(p => p.type === "image"
+    ? {type:"image_url", image_url:{url:`data:${p.mimeType};base64,${p.base64}`}}
+    : {type:"text", text: p.text});
   const res = await fetch(endpoint, {
     method:"POST",
     headers:{ "Content-Type":"application/json", "Authorization":"Bearer " + apiKey },
@@ -530,11 +545,11 @@ async function callCustomOpenAI({endpoint, apiKey, model, prompt, images}){
   return data.choices?.[0]?.message?.content || "";
 }
 
-async function callProviderVision(provider, {prompt, images}){
+async function callProviderVision(provider, {prompt, images, parts}){
   const v = cfg.load();
-  if (provider === "gemini") return callGemini({apiKey:v.geminiKey, model:v.geminiModel, prompt, images});
-  if (provider === "claude") return callClaude({apiKey:v.claudeKey, model:v.claudeModel, prompt, images});
-  return callCustomOpenAI({endpoint:v.customEndpoint, apiKey:v.customKey, model:v.customModel, prompt, images});
+  if (provider === "gemini") return callGemini({apiKey:v.geminiKey, model:v.geminiModel, prompt, images, parts});
+  if (provider === "claude") return callClaude({apiKey:v.claudeKey, model:v.claudeModel, prompt, images, parts});
+  return callCustomOpenAI({endpoint:v.customEndpoint, apiKey:v.customKey, model:v.customModel, prompt, images, parts});
 }
 
 /* =========================================================
@@ -599,6 +614,7 @@ try{
 
 const BATCH_SIZE = 6;      // páginas por chamada de API
 const MAX_DIM = 1600;      // maior lado da imagem renderizada, em px
+const SCAN_THRESHOLD = 25; // caracteres mínimos extraídos p/ considerar a página "digital" (senão, é tratada como escaneada)
 
 async function renderPageToImage(pdf, pageNum){
   const page = await pdf.getPage(pageNum);
@@ -613,13 +629,78 @@ async function renderPageToImage(pdf, pageNum){
   return dataUrl.split(",")[1];
 }
 
-function buildPdfPrompt(pageNumbers){
-  return `Transcreva integralmente o conteúdo destas páginas de um PDF para Markdown, na ordem em que aparecem. `+
-  `Preserve toda a formatação: negrito, itálico, títulos e subtítulos, listas, tabelas e citações. `+
-  `Notas de rodapé devem virar notas de rodapé em Markdown (ex.: um trecho com nota[^1] e, ao final do conteúdo da respectiva página, a definição "[^1]: texto da nota"). `+
-  `Insira o número de cada página entre colchetes (ex.: [12]) no meio do fluxo natural do texto, exatamente no ponto em que a página muda — nunca como título isolado nem quebrando uma palavra. `+
-  `As páginas enviadas nesta leva correspondem, nesta ordem, aos números: ${pageNumbers.join(", ")}. `+
-  `Não adicione comentários, introduções ou observações suas: responda apenas com o markdown transcrito, começando já no conteúdo.`;
+// Extrai o texto nativo da página via pdf.js (exato, mas sem informação de negrito/itálico —
+// a API pública do pdf.js não expõe isso de forma confiável). Detecta títulos pelo tamanho da fonte.
+async function extractPageText(pdf, pageNum){
+  const page = await pdf.getPage(pageNum);
+  const tc = await page.getTextContent();
+  if (!tc.items.length) return {text:"", charCount:0};
+  const heights = tc.items.map(it=>Math.hypot(it.transform[2], it.transform[3])).filter(h=>h>0);
+  heights.sort((a,b)=>a-b);
+  const median = heights[Math.floor(heights.length/2)] || 10;
+
+  let charCount = 0, out = [];
+  let prevItem = null, curLineParts = [], curLineH = 0;
+  function flushLine(){
+    if (curLineParts.length){
+      const text = curLineParts.join("").replace(/[ \t]+/g," ").trim();
+      if (text){
+        charCount += text.length;
+        const ratio = curLineH / median;
+        out.push(ratio > 1.7 ? ("# "+text) : ratio > 1.3 ? ("## "+text) : text);
+      }
+    }
+    curLineParts = []; curLineH = 0;
+  }
+  for (const it of tc.items){
+    if (!it.str && !it.hasEOL) continue;
+    const h = Math.hypot(it.transform[2], it.transform[3]) || median;
+    let str = it.str || "";
+    if (prevItem){
+      const sameLine = Math.abs(it.transform[5] - prevItem.transform[5]) < median * 0.4;
+      if (!sameLine){ flushLine(); curLineH = h; }
+      else {
+        const prevEndX = prevItem.transform[4] + (prevItem.width || 0);
+        const gap = it.transform[4] - prevEndX;
+        if (gap > h * 0.15 && curLineParts.length) curLineParts.push(" ");
+        curLineH = Math.max(curLineH, h);
+      }
+    } else { curLineH = h; }
+    curLineParts.push(str);
+    if (it.hasEOL) flushLine();
+    prevItem = it;
+  }
+  flushLine();
+  return { text: out.join("\n"), charCount };
+}
+
+function hybridIntro(){
+  return `Você vai transcrever páginas de um PDF para Markdown. Para cada página abaixo você recebe, nesta ordem: `+
+    `(1) o texto exato já extraído nativamente do PDF — não tem erro de leitura, use-o literalmente, palavra por palavra, sem reescrever, resumir, corrigir ou adivinhar nada diferente dele; `+
+    `e (2) a imagem da própria página, que serve só para você enxergar a formatação visual (o que está em negrito, itálico, títulos, tabelas, citações, notas de rodapé) e aplicar essa formatação ao texto já fornecido. `+
+    `Quando uma página vier marcada como "sem texto nativo", é porque é uma página escaneada/imagem: nesse caso, transcreva-a integralmente a partir da imagem, normalmente, como OCR. `+
+    `Insira o número de cada página entre colchetes (ex.: [12]) no fluxo natural do texto, exatamente no ponto em que a página muda — nunca como título isolado nem quebrando uma palavra. `+
+    `Notas de rodapé devem virar notas de rodapé em Markdown (ex.: um trecho com nota[^1] e, ao final do conteúdo da respectiva página, a definição "[^1]: texto da nota"). `+
+    `Não adicione comentários, introduções ou observações suas: responda apenas com o markdown transcrito, começando já no conteúdo.`;
+}
+
+function pageLabelText(pageNum, extracted){
+  if (extracted.charCount >= SCAN_THRESHOLD){
+    return `--- Página ${pageNum} — texto nativo extraído (use como base literal) ---\n${extracted.text}`;
+  }
+  return `--- Página ${pageNum} — sem texto nativo (provável página escaneada; transcreva pela imagem) ---`;
+}
+
+// Monta as partes intercaladas (texto nativo + imagem) para um conjunto de páginas
+async function buildHybridParts(pdf, pageNumbers){
+  const parts = [{type:"text", text: hybridIntro()}];
+  for (const p of pageNumbers){
+    const extracted = await extractPageText(pdf, p);
+    parts.push({type:"text", text: pageLabelText(p, extracted)});
+    const b64 = await renderPageToImage(pdf, p);
+    parts.push({type:"image", mimeType:"image/jpeg", base64:b64});
+  }
+  return parts;
 }
 
 async function processPdfFile(file){
@@ -641,26 +722,20 @@ async function processPdfFile(file){
     for (let start = 1; start <= total; start += BATCH_SIZE){
       const end = Math.min(start + BATCH_SIZE - 1, total);
       const pageNumbers = [];
-      const images = [];
-      for (let p = start; p <= end; p++){
-        const b64 = await renderPageToImage(pdf, p);
-        images.push({mimeType:"image/jpeg", base64:b64});
-        pageNumbers.push(p);
-      }
+      for (let p = start; p <= end; p++) pageNumbers.push(p);
       setProgress(`Transcrevendo páginas ${start}–${end} de ${total}…`, Math.round((start/total)*100));
       try{
-        const prompt = buildPdfPrompt(pageNumbers);
-        const chunkMd = await callProviderVision(provider, {prompt, images});
+        const parts = await buildHybridParts(pdf, pageNumbers);
+        const chunkMd = await callProviderVision(provider, {parts});
         fullMarkdown += (fullMarkdown ? "\n\n" : "") + chunkMd.trim();
       }catch(batchErr){
         // o lote inteiro falhou (bloqueio, corte de tokens, instabilidade da API):
         // tenta de novo página a página em vez de perder o progresso já feito
         setProgress(`Lote ${start}–${end} falhou, tentando página a página…`, Math.round((start/total)*100));
-        for (let i=0; i<pageNumbers.length; i++){
-          const p = pageNumbers[i];
+        for (const p of pageNumbers){
           try{
-            const prompt = buildPdfPrompt([p]);
-            const pageMd = await callProviderVision(provider, {prompt, images:[images[i]]});
+            const parts = await buildHybridParts(pdf, [p]);
+            const pageMd = await callProviderVision(provider, {parts});
             fullMarkdown += (fullMarkdown ? "\n\n" : "") + pageMd.trim();
           }catch(pageErr){
             falhas.push(p);

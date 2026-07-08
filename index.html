@@ -460,18 +460,29 @@ document.querySelectorAll("nav.tabs button").forEach(btn=>{
    Chamadas às APIs (visão: imagens + texto)
    images: [{mimeType, base64}]
    ========================================================= */
-async function callGemini({apiKey, model, prompt, images, useUrlContext, fileUri}){
+async function callGemini({apiKey, model, prompt, images, useUrlContext, fileUri, videoRange, lowRes, maxOutputTokens}){
   const parts = [{text: prompt}];
   if (images) images.forEach(img => parts.push({inlineData:{mimeType: img.mimeType, data: img.base64}}));
-  if (fileUri) parts.push({fileData:{fileUri}});
-  const body = { contents:[{parts}], generationConfig:{ maxOutputTokens: 8192 } };
+  if (fileUri){
+    const videoPart = {fileData:{fileUri}};
+    if (videoRange) videoPart.videoMetadata = { startOffset:{seconds: videoRange.startSec}, endOffset:{seconds: videoRange.endSec} };
+    parts.push(videoPart);
+  }
+  const generationConfig = { maxOutputTokens: maxOutputTokens || 8192 };
+  if (lowRes) generationConfig.mediaResolution = "MEDIA_RESOLUTION_LOW";
+  const body = { contents:[{parts}], generationConfig };
   if (useUrlContext) body.tools = [{url_context:{}}];
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
     method:"POST",
     headers:{ "Content-Type":"application/json", "x-goog-api-key": apiKey },
     body: JSON.stringify(body)
   });
-  if (!res.ok) throw new Error("Gemini: " + res.status + " " + (await res.text()).slice(0,300));
+  if (!res.ok){
+    const errText = (await res.text()).slice(0,300);
+    const err = new Error("Gemini: " + res.status + " " + errText);
+    if (/exceeds the maximum number of tokens/i.test(errText)) err.tokenLimitExceeded = true;
+    throw err;
+  }
   const data = await res.json();
   const cand = data.candidates && data.candidates[0];
   if (!cand) throw new Error("Gemini não retornou nenhum candidato de resposta (possível bloqueio de segurança ou URL inacessível).");
@@ -689,6 +700,47 @@ dropZone.addEventListener("drop", e=>{
 /* =========================================================
    YouTube (somente Gemini — entende a URL nativamente)
    ========================================================= */
+/* =========================================================
+   YouTube — 1ª tentativa: extrair a legenda diretamente (barato);
+   se falhar, cai automaticamente para o Gemini "assistir" o vídeo.
+   ========================================================= */
+async function tryExtractCaptionMarkdown(apiKey, model, videoUrl){
+  // Passo 1: achar o endereço da faixa de legenda embutido no HTML da página do vídeo
+  const findPrompt = `Esta é a página de um vídeo do YouTube. No código-fonte/HTML dela existe um objeto JSON com o caminho `+
+    `captions.playerCaptionsTracklistRenderer.captionTracks, uma lista de faixas de legenda, cada uma com um campo "baseUrl". `+
+    `Prefira uma faixa que NÃO seja do tipo automática (sem "kind":"asr") no idioma original do vídeo; se não houver nenhuma, use a primeira faixa automática disponível. `+
+    `Responda apenas com o valor cru dessa baseUrl (começando com "https://"), sem aspas, sem explicação, sem markdown. `+
+    `Se não encontrar nenhuma faixa de legenda na página, responda apenas com a palavra SEM_LEGENDA.`;
+  let baseUrl;
+  try{
+    baseUrl = (await callGemini({apiKey, model, prompt: findPrompt + `\n\nURL da página do vídeo: ${videoUrl}`, useUrlContext:true, maxOutputTokens:500})).trim();
+    baseUrl = baseUrl.replace(/^["'`]|["'`]$/g, "").split(/\s+/)[0];
+  }catch(e){ return null; }
+  if (!baseUrl || !/^https?:\/\//.test(baseUrl) || /SEM_LEGENDA/i.test(baseUrl)) return null;
+
+  // Passo 2: buscar o conteúdo dessa faixa e já compilar em Markdown
+  const compilePrompt = `Este endereço contém o conteúdo bruto de uma faixa de legendas do YouTube (formato XML timedtext ou VTT, com marcações de tempo). `+
+    `Compile o texto falado, corrido e organizado em Markdown, com títulos por tema quando fizer sentido, agrupando as frases em parágrafos coerentes (não deixe uma linha por legenda). `+
+    `Insira marcações de tempo aproximadas entre colchetes (ex.: [12:34]) no fluxo natural do texto, no início de cada novo bloco de assunto. `+
+    `Não adicione comentários seus, apenas o conteúdo compilado. Se o endereço não retornar nenhum texto de legenda utilizável, responda apenas com a palavra SEM_LEGENDA.`;
+  let compiled;
+  try{
+    compiled = (await callGemini({apiKey, model, prompt: compilePrompt + `\n\nEndereço: ${baseUrl}`, useUrlContext:true, maxOutputTokens:8192})).trim();
+  }catch(e){ return null; }
+  if (!compiled || compiled.length < 40 || /^SEM_LEGENDA/i.test(compiled)) return null;
+  return compiled;
+}
+
+function ytPrompt(rangeLabel){
+  return `Assista a ${rangeLabel ? "este trecho (" + rangeLabel + ") de" : "este"} vídeo do YouTube e transcreva a fala/conteúdo de forma integral e organizada em Markdown, com títulos por tema quando fizer sentido. `+
+    `Preserve ênfases relevantes (negrito/itálico) quando perceptíveis. Insira marcações de tempo aproximadas entre colchetes (ex.: [12:34], no formato do vídeo inteiro, não relativo ao trecho) no fluxo natural do texto, no início de cada novo bloco de assunto. `+
+    `Não adicione comentários seus: responda apenas com o conteúdo transcrito. Se o trecho pedido estiver além do fim do vídeo, ou não houver conteúdo de fala nele, responda apenas com a palavra FIM_DO_VIDEO.`;
+}
+function fmtHMS(sec){
+  const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = Math.floor(sec%60);
+  return (h?h+"h":"") + String(m).padStart(2,"0")+"m"+String(s).padStart(2,"0")+"s";
+}
+
 document.getElementById("ytGo").addEventListener("click", async ()=>{
   clearError(); fullMarkdown = "";
   const url = document.getElementById("ytUrl").value.trim();
@@ -696,21 +748,76 @@ document.getElementById("ytGo").addEventListener("click", async ()=>{
   window.__escribaFileName = "youtube-transcricao";
   if (!url){ showError("Informe o endereço do vídeo."); return; }
   if (!v.geminiKey){ showError("Configure a chave do Gemini em Configurações (⚙) para usar este recurso."); return; }
+
+  const SEGMENT = 1200; // 20 minutos por trecho, usado só se o vídeo inteiro não couber de uma vez
+  const MAX_SEGMENTS = 20; // trava de segurança (~6h40 de vídeo)
+
+  setProgress("Tentando extrair a legenda diretamente…", 10);
   try{
-    setProgress("Assistindo e transcrevendo o vídeo…", 30);
-    const prompt = `Assista a este vídeo do YouTube e transcreva a fala/conteúdo de forma integral e organizada em Markdown, com títulos por tema quando fizer sentido. `+
-      `Preserve ênfases relevantes (negrito/itálico) quando perceptíveis. Insira marcações de tempo aproximadas entre colchetes (ex.: [12:34]) no fluxo natural do texto, no início de cada novo bloco de assunto. `+
-      `Não adicione comentários seus: responda apenas com o conteúdo transcrito.`;
-    const md = await callGemini({apiKey:v.geminiKey, model:v.geminiModel, prompt, fileUri:url});
+    const captionMd = await tryExtractCaptionMarkdown(v.geminiKey, v.geminiModel, url);
+    if (captionMd){
+      fullMarkdown = captionMd;
+      renderOutput();
+      setProgress("Concluído (a partir da legenda — mais rápido e barato).", 100);
+      setTimeout(hideProgress, 1500);
+      return;
+    }
+  }catch(e){ /* segue para o modo de assistir o vídeo */ }
+
+  try{
+    setProgress("Legenda não disponível diretamente — assistindo e transcrevendo o vídeo…", 20);
+    // 1ª tentativa: vídeo inteiro em resolução de mídia baixa (suficiente para fala/legendas, ~3x mais barato em tokens)
+    const md = await callGemini({apiKey:v.geminiKey, model:v.geminiModel, prompt: ytPrompt(), fileUri:url, lowRes:true});
     fullMarkdown = md.trim();
     renderOutput();
     setProgress("Concluído.", 100);
     setTimeout(hideProgress, 1200);
   }catch(err){
-    hideProgress();
-    showError("Falha ao transcrever o vídeo: " + err.message);
+    if (!err.tokenLimitExceeded){
+      hideProgress();
+      showError("Falha ao transcrever o vídeo: " + err.message);
+      return;
+    }
+    // Vídeo longo demais para uma única chamada: processa em segmentos de tempo
+    try{
+      let consecutiveEmpty = 0;
+      for (let seg = 0; seg < MAX_SEGMENTS; seg++){
+        const startSec = seg * SEGMENT, endSec = startSec + SEGMENT;
+        setProgress(`Vídeo longo — transcrevendo trecho ${fmtHMS(startSec)}–${fmtHMS(endSec)}…`, Math.min(95, seg*8));
+        let chunk;
+        try{
+          chunk = await callGemini({
+            apiKey:v.geminiKey, model:v.geminiModel,
+            prompt: ytPrompt(`${fmtHMS(startSec)} a ${fmtHMS(endSec)}`),
+            fileUri:url, lowRes:true,
+            videoRange:{startSec, endSec}
+          });
+        }catch(segErr){
+          consecutiveEmpty++;
+          if (consecutiveEmpty >= 2) break; // provavelmente passou do fim do vídeo
+          continue;
+        }
+        if (!chunk || !chunk.trim() || /^FIM_DO_VIDEO/i.test(chunk.trim())){
+          consecutiveEmpty++;
+          if (consecutiveEmpty >= 2) break;
+          continue;
+        }
+        consecutiveEmpty = 0;
+        fullMarkdown += (fullMarkdown ? "\n\n" : "") + chunk.trim();
+        renderOutput();
+      }
+      if (!fullMarkdown){
+        throw new Error("não foi possível obter conteúdo do vídeo em nenhum trecho.");
+      }
+      setProgress("Concluído (vídeo processado em trechos por ser longo).", 100);
+      setTimeout(hideProgress, 2000);
+    }catch(err2){
+      hideProgress();
+      showError("Falha ao transcrever o vídeo (mesmo dividido em trechos): " + err2.message + " — o texto já obtido continua disponível abaixo.");
+    }
   }
 });
+
 
 /* =========================================================
    Site (somente Gemini — url_context faz a busca no servidor)

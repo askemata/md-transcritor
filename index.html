@@ -464,7 +464,7 @@ async function callGemini({apiKey, model, prompt, images, useUrlContext, fileUri
   const parts = [{text: prompt}];
   if (images) images.forEach(img => parts.push({inlineData:{mimeType: img.mimeType, data: img.base64}}));
   if (fileUri) parts.push({fileData:{fileUri}});
-  const body = { contents:[{parts}] };
+  const body = { contents:[{parts}], generationConfig:{ maxOutputTokens: 8192 } };
   if (useUrlContext) body.tools = [{url_context:{}}];
   const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
     method:"POST",
@@ -474,8 +474,18 @@ async function callGemini({apiKey, model, prompt, images, useUrlContext, fileUri
   if (!res.ok) throw new Error("Gemini: " + res.status + " " + (await res.text()).slice(0,300));
   const data = await res.json();
   const cand = data.candidates && data.candidates[0];
-  if (!cand) throw new Error("Gemini não retornou conteúdo (possível bloqueio de segurança ou URL inacessível).");
-  return (cand.content.parts || []).map(p=>p.text||"").join("\n");
+  if (!cand) throw new Error("Gemini não retornou nenhum candidato de resposta (possível bloqueio de segurança ou URL inacessível).");
+  if (!cand.content || !Array.isArray(cand.content.parts) || cand.content.parts.length === 0){
+    const motivos = {
+      SAFETY: "bloqueio por filtro de segurança",
+      RECITATION: "bloqueio por suspeita de reprodução de conteúdo protegido",
+      MAX_TOKENS: "resposta cortada por limite de tokens de saída",
+      OTHER: "motivo não especificado pela API"
+    };
+    const reason = cand.finishReason || "OTHER";
+    throw new Error(`Gemini não retornou texto para este trecho (${motivos[reason] || reason}). Tente novamente ou, se persistir, reduza o lote de páginas.`);
+  }
+  return cand.content.parts.map(p=>p.text||"").join("\n");
 }
 
 async function callClaude({apiKey, model, prompt, images}){
@@ -616,6 +626,7 @@ async function processPdfFile(file){
     let done = 0;
     setProgress(`Lendo ${total} página(s)…`, 2);
 
+    const falhas = [];
     for (let start = 1; start <= total; start += BATCH_SIZE){
       const end = Math.min(start + BATCH_SIZE - 1, total);
       const pageNumbers = [];
@@ -626,18 +637,40 @@ async function processPdfFile(file){
         pageNumbers.push(p);
       }
       setProgress(`Transcrevendo páginas ${start}–${end} de ${total}…`, Math.round((start/total)*100));
-      const prompt = buildPdfPrompt(pageNumbers);
-      const chunkMd = await callProviderVision(provider, {prompt, images});
-      fullMarkdown += (fullMarkdown ? "\n\n" : "") + chunkMd.trim();
+      try{
+        const prompt = buildPdfPrompt(pageNumbers);
+        const chunkMd = await callProviderVision(provider, {prompt, images});
+        fullMarkdown += (fullMarkdown ? "\n\n" : "") + chunkMd.trim();
+      }catch(batchErr){
+        // o lote inteiro falhou (bloqueio, corte de tokens, instabilidade da API):
+        // tenta de novo página a página em vez de perder o progresso já feito
+        setProgress(`Lote ${start}–${end} falhou, tentando página a página…`, Math.round((start/total)*100));
+        for (let i=0; i<pageNumbers.length; i++){
+          const p = pageNumbers[i];
+          try{
+            const prompt = buildPdfPrompt([p]);
+            const pageMd = await callProviderVision(provider, {prompt, images:[images[i]]});
+            fullMarkdown += (fullMarkdown ? "\n\n" : "") + pageMd.trim();
+          }catch(pageErr){
+            falhas.push(p);
+            fullMarkdown += `\n\n> ⚠️ **[${p}] não foi possível transcrever esta página automaticamente** (${pageErr.message}). Tente processá-la de novo separadamente.\n`;
+          }
+          renderOutput();
+        }
+      }
       done = end;
       setProgress(`Transcrevendo páginas ${start}–${end} de ${total}…`, Math.round((done/total)*100));
       renderOutput();
     }
-    setProgress(`Concluído — ${total} página(s).`, 100);
-    setTimeout(hideProgress, 1500);
+    if (falhas.length){
+      setProgress(`Concluído com ${falhas.length} página(s) pendente(s): ${falhas.join(", ")}.`, 100);
+    } else {
+      setProgress(`Concluído — ${total} página(s).`, 100);
+    }
+    setTimeout(hideProgress, 2500);
   }catch(err){
     hideProgress();
-    showError("Falha na transcrição do PDF: " + err.message);
+    showError("Falha na transcrição do PDF: " + err.message + " — o texto já transcrito até aqui continua disponível abaixo.");
   }
 }
 

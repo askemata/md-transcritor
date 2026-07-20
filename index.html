@@ -1,924 +1,908 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-<title>Escriba — transcrição para Markdown</title>
-<meta name="theme-color" content="#22201c">
-<meta name="description" content="Transcreve PDFs, vídeos do YouTube e páginas da web para Markdown fiel.">
-<link id="manifestLink" rel="manifest" href="">
-<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Crect width='100' height='100' rx='14' fill='%2322201c'/%3E%3Cpath d='M28 74 L50 22 L72 74 M36 56 H64' stroke='%23A63D2F' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/12.0.2/marked.min.js"></script>
-<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+<meta name="theme-color" content="#0e1116" />
+<title>Askesis Transcription</title>
+<link rel="manifest" href="data:application/manifest+json;base64,eyJuYW1lIjoiQXNrZXNpcyBUcmFuc2NyaXB0aW9uIiwic2hvcnRfbmFtZSI6IkFza2VzaXMiLCJzdGFydF91cmwiOiIuIiwiZGlzcGxheSI6InN0YW5kYWxvbmUiLCJiYWNrZ3JvdW5kX2NvbG9yIjoiIzBlMTExNiIsInRoZW1lX2NvbG9yIjoiIzBlMTExNiIsImRlc2NyaXB0aW9uIjoiVHJhbnNjcml0b3IgbG9jYWwgcGFyYSBNYXJrZG93biBjb20gb3JnYW5pemHDp8OjbyBwb3IgSUEgQllPSy4iLCJpY29ucyI6W119" />
 <style>
+  @import url('https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,400;9..144,600&family=IBM+Plex+Mono:wght@400;500;600&family=Inter:wght@400;450;500;600&display=swap');
+
   :root{
-    --paper:#FAF7F0;
-    --paper-dim:#F1ECE0;
-    --ink:#22201C;
-    --ink-soft:#4A453C;
-    --graphite:#6B6459;
-    --rubric:#A63D2F;
-    --rubric-dark:#832F24;
-    --moss:#46654B;
-    --rule:#DED4B9;
-    --rule-strong:#C9BC98;
-    --shadow: 0 1px 2px rgba(34,32,28,.06), 0 4px 16px rgba(34,32,28,.06);
-    --serif: ui-serif, Georgia, "Times New Roman", serif;
-    --sans: -apple-system, "Segoe UI", system-ui, sans-serif;
-    --mono: ui-monospace, "SF Mono", "JetBrains Mono", Consolas, monospace;
+    --ink:#0e1116;        /* near-black ground */
+    --ink2:#161b22;       /* panel */
+    --ink3:#1e2530;       /* raised */
+    --line:#2a3340;       /* hairline */
+    --line2:#39465a;
+    --text:#e6eaf0;
+    --muted:#8b98ab;
+    --faint:#5a6779;
+    --acc:#7fd6c2;        /* verdigris — patina of old bronze, "askesis"/monastic */
+    --acc2:#c9a86a;       /* aged brass */
+    --warn:#e0a458;
+    --err:#e06a6a;
+    --ok:#7fd6c2;
+    --radius:2px;
+    --mono:'IBM Plex Mono',monospace;
+    --disp:'Fraunces',Georgia,serif;
+    --body:'Inter',system-ui,sans-serif;
   }
-  *{box-sizing:border-box;}
-  html,body{margin:0;padding:0;}
+  *{box-sizing:border-box}
+  html,body{margin:0;height:100%}
   body{
-    background:var(--paper);
-    color:var(--ink);
-    font-family:var(--sans);
-    -webkit-font-smoothing:antialiased;
-    min-height:100vh;
+    background:var(--ink);color:var(--text);font-family:var(--body);
+    font-size:15px;line-height:1.55;-webkit-font-smoothing:antialiased;
+    padding-bottom:env(safe-area-inset-bottom);
   }
-  ::selection{background:#E9C9BE;}
+  a{color:var(--acc);text-decoration:none}
+  button{font-family:inherit;cursor:pointer}
+  ::selection{background:var(--acc);color:var(--ink)}
 
-  /* ---------- header ---------- */
-  header.app-header{
-    display:flex;align-items:baseline;justify-content:space-between;
-    padding:22px 20px 16px;
-    border-bottom:1px solid var(--rule);
-    max-width:920px;margin:0 auto;
+  /* ---------- shell ---------- */
+  .wrap{max-width:1180px;margin:0 auto;padding:0 20px}
+  header.top{
+    border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20;
+    background:rgba(14,17,22,.86);backdrop-filter:blur(10px);
   }
-  header.app-header h1{
-    font-family:var(--serif);
-    font-weight:600;
-    font-size:26px;
-    letter-spacing:.2px;
-    margin:0;
-    display:flex;align-items:baseline;gap:10px;
+  .top .wrap{display:flex;align-items:center;gap:14px;height:60px}
+  .brand{display:flex;align-items:center;gap:11px}
+  .glyph{width:30px;height:30px;flex:none}
+  .brand .name{font-family:var(--disp);font-weight:600;font-size:19px;letter-spacing:.3px}
+  .brand .name b{color:var(--acc);font-weight:600}
+  .brand .sub{font-family:var(--mono);font-size:10px;color:var(--faint);letter-spacing:2px;text-transform:uppercase;margin-top:-2px}
+  .spacer{flex:1}
+  .ghost-btn{
+    background:transparent;border:1px solid var(--line2);color:var(--muted);
+    padding:7px 12px;border-radius:var(--radius);font-size:12.5px;font-family:var(--mono);
+    letter-spacing:.5px;transition:.15s;display:inline-flex;align-items:center;gap:6px;
   }
-  header.app-header h1 .mark{color:var(--rubric);font-style:italic;font-size:.8em;}
-  header.app-header .tag{
-    font-size:12px;color:var(--graphite);letter-spacing:.04em;
-  }
-  button.icon-btn{
-    background:none;border:1px solid var(--rule-strong);
-    color:var(--ink-soft);
-    width:38px;height:38px;border-radius:8px;
-    cursor:pointer;font-size:16px;
-    display:flex;align-items:center;justify-content:center;
-    transition:.15s border-color, .15s background;
-  }
-  button.icon-btn:hover{border-color:var(--rubric);color:var(--rubric);}
+  .ghost-btn:hover{border-color:var(--acc);color:var(--acc)}
+  .ghost-btn.on{border-color:var(--acc);color:var(--acc)}
 
-  main{max-width:920px;margin:0 auto;padding:20px;}
-
-  /* ---------- tabs ---------- */
-  nav.tabs{display:flex;gap:2px;margin-bottom:18px;border-bottom:1px solid var(--rule);}
-  nav.tabs button{
-    font-family:var(--serif);font-size:15px;
-    background:none;border:none;
-    padding:10px 18px 12px;
-    color:var(--graphite);
-    cursor:pointer;position:relative;top:1px;
-    border-bottom:2px solid transparent;
+  /* privacy strip */
+  .privacy{
+    font-family:var(--mono);font-size:11.5px;color:var(--faint);
+    border-bottom:1px solid var(--line);letter-spacing:.3px;
   }
-  nav.tabs button.active{color:var(--ink);border-bottom-color:var(--rubric);}
-  nav.tabs button .n{color:var(--rubric);font-style:italic;margin-right:6px;font-size:.85em;}
+  .privacy .wrap{display:flex;align-items:center;gap:8px;height:34px;flex-wrap:wrap}
+  .privacy .dot{width:6px;height:6px;border-radius:50%;background:var(--ok);flex:none;box-shadow:0 0 8px var(--ok)}
+  .privacy b{color:var(--muted);font-weight:500}
 
-  section.panel{display:none;}
-  section.panel.active{display:block;}
+  /* hero */
+  .hero{padding:46px 0 30px;border-bottom:1px solid var(--line)}
+  .hero .wrap{max-width:760px}
+  .eyebrow{font-family:var(--mono);font-size:11px;letter-spacing:3px;text-transform:uppercase;color:var(--acc2);margin-bottom:16px}
+  .hero h1{font-family:var(--disp);font-weight:400;font-size:clamp(30px,5vw,46px);line-height:1.08;margin:0 0 14px;letter-spacing:-.5px}
+  .hero h1 em{font-style:italic;color:var(--acc)}
+  .hero p{color:var(--muted);font-size:15.5px;margin:0;max-width:600px}
 
-  .card{
-    background:#fff;border:1px solid var(--rule);border-radius:10px;
-    padding:22px;box-shadow:var(--shadow);
+  /* layout */
+  .cols{display:grid;grid-template-columns:1fr 1fr;gap:26px;padding:30px 0 80px;align-items:start}
+  @media(max-width:880px){.cols{grid-template-columns:1fr}}
+
+  .panel{background:var(--ink2);border:1px solid var(--line);border-radius:var(--radius)}
+  .panel-h{
+    display:flex;align-items:center;gap:9px;padding:13px 16px;border-bottom:1px solid var(--line);
+    font-family:var(--mono);font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--muted);
   }
+  .panel-h .n{color:var(--acc);font-weight:600}
+  .panel-b{padding:16px}
+
+  /* tabs */
+  .tabs{display:flex;gap:2px;background:var(--ink);border:1px solid var(--line);border-radius:var(--radius);padding:3px;margin-bottom:14px}
+  .tab{flex:1;padding:8px;background:transparent;border:none;color:var(--muted);font-size:12.5px;font-family:var(--mono);letter-spacing:.5px;border-radius:var(--radius);transition:.15s}
+  .tab.on{background:var(--ink3);color:var(--text)}
+
+  label.fld{display:block;font-size:12px;color:var(--muted);margin-bottom:6px;font-family:var(--mono);letter-spacing:.4px}
+  input[type=text],input[type=url],input[type=password],textarea,select{
+    width:100%;background:var(--ink);border:1px solid var(--line2);color:var(--text);
+    border-radius:var(--radius);padding:10px 12px;font-size:14px;font-family:var(--body);transition:.15s;
+  }
+  input:focus,textarea:focus,select:focus{outline:none;border-color:var(--acc)}
+  input::placeholder{color:var(--faint)}
+
   .drop{
-    border:1.5px dashed var(--rule-strong);border-radius:10px;
-    padding:34px 20px;text-align:center;color:var(--graphite);
-    cursor:pointer;transition:.15s border-color,.15s background;
+    border:1.5px dashed var(--line2);border-radius:var(--radius);padding:30px 18px;text-align:center;
+    color:var(--muted);transition:.15s;cursor:pointer;
   }
-  .drop:hover, .drop.drag{border-color:var(--rubric);background:#FBF3EF;}
-  .drop strong{color:var(--ink);font-family:var(--serif);font-size:17px;}
-  .drop small{display:block;margin-top:6px;font-size:12.5px;}
-  input[type=file]{display:none;}
+  .drop:hover,.drop.drag{border-color:var(--acc);background:rgba(127,214,194,.04);color:var(--text)}
+  .drop .big{font-family:var(--mono);font-size:13px;letter-spacing:.5px;color:var(--text)}
+  .drop .small{font-size:11.5px;margin-top:6px;font-family:var(--mono);color:var(--faint)}
 
-  input[type=url], input[type=text], input[type=password], select, textarea{
-    font-family:var(--sans);font-size:14.5px;
-    padding:11px 12px;border:1px solid var(--rule-strong);border-radius:8px;
-    background:var(--paper);color:var(--ink);width:100%;
+  .btn{
+    background:var(--acc);color:var(--ink);border:none;padding:11px 16px;border-radius:var(--radius);
+    font-weight:600;font-size:13.5px;font-family:var(--mono);letter-spacing:.5px;width:100%;transition:.15s;
+    display:inline-flex;align-items:center;justify-content:center;gap:8px;
   }
-  input[type=url]:focus, input[type=text]:focus, input[type=password]:focus, select:focus, textarea:focus{
-    outline:2px solid var(--rubric);outline-offset:1px;border-color:var(--rubric);
-  }
-  label.field{display:block;margin-bottom:14px;}
-  label.field span.lbl{display:block;font-size:12.5px;color:var(--graphite);margin-bottom:6px;letter-spacing:.02em;}
+  .btn:hover{filter:brightness(1.08)}
+  .btn:disabled{opacity:.4;cursor:not-allowed;filter:none}
+  .btn.sec{background:transparent;border:1px solid var(--line2);color:var(--muted)}
+  .btn.sec:hover{border-color:var(--acc);color:var(--acc);filter:none}
+  .btn.brass{background:var(--acc2)}
+  .row{display:flex;gap:10px}
+  .row>*{flex:1}
 
-  .row{display:flex;gap:10px;}
-  .row > *{flex:1;}
+  /* progress */
+  .prog{margin-top:14px;font-family:var(--mono);font-size:12px}
+  .bar{height:5px;background:var(--ink);border:1px solid var(--line);border-radius:99px;overflow:hidden;margin-top:7px}
+  .bar>i{display:block;height:100%;background:linear-gradient(90deg,var(--acc),var(--acc2));width:0;transition:width .3s}
+  .prog .lbl{display:flex;justify-content:space-between;color:var(--muted)}
 
-  button.primary{
-    font-family:var(--sans);font-weight:600;font-size:14px;
-    background:var(--rubric);color:#fff;border:none;border-radius:8px;
-    padding:11px 20px;cursor:pointer;
-    transition:.15s background;
-  }
-  button.primary:hover{background:var(--rubric-dark);}
-  button.primary:disabled{background:#C9A79E;cursor:not-allowed;}
-  button.ghost{
-    font-family:var(--sans);font-size:13.5px;
-    background:none;border:1px solid var(--rule-strong);color:var(--ink-soft);
-    border-radius:8px;padding:9px 14px;cursor:pointer;
-  }
-  button.ghost:hover{border-color:var(--ink-soft);}
+  /* status log */
+  .log{font-family:var(--mono);font-size:11.5px;color:var(--faint);margin-top:10px;max-height:120px;overflow:auto;line-height:1.7}
+  .log .e{color:var(--err)} .log .w{color:var(--warn)} .log .ok{color:var(--ok)}
 
-  .notice{
-    font-size:13px;line-height:1.5;color:var(--ink-soft);
-    background:var(--paper-dim);border-left:3px solid var(--rubric);
-    padding:10px 13px;border-radius:0 6px 6px 0;margin-top:14px;
+  /* editor */
+  .ed-wrap{display:flex;flex-direction:column}
+  .ed-tabs{display:flex;gap:2px;padding:3px;margin:0 16px;margin-top:0}
+  .ed-toolbar{display:flex;gap:8px;padding:10px 16px;border-bottom:1px solid var(--line);flex-wrap:wrap}
+  .mini{background:var(--ink3);border:1px solid var(--line);color:var(--muted);padding:6px 11px;border-radius:var(--radius);font-size:11.5px;font-family:var(--mono);letter-spacing:.4px;transition:.15s}
+  .mini:hover{border-color:var(--acc);color:var(--acc)}
+  .mini:disabled{opacity:.35;cursor:not-allowed}
+  .fname-bar{display:flex;gap:12px;align-items:flex-end;padding:11px 16px;border-bottom:1px solid var(--line);background:var(--ink2);flex-wrap:wrap}
+  .fname-bar .ff{flex:1;min-width:120px}
+  .fname-bar .fld{margin-bottom:4px;font-size:10.5px;letter-spacing:1.2px;text-transform:uppercase}
+  .fname-bar input{padding:6px 9px;font-size:12.5px;font-family:var(--mono)}
+  .fname-bar .fn{flex:1.4;min-width:160px}
+  .fname-bar code{
+    display:block;font-family:var(--mono);font-size:12px;color:var(--acc2);
+    background:var(--ink);border:1px solid var(--line);border-radius:var(--radius);
+    padding:6px 9px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
   }
-  .notice.block{border-left-color:var(--graphite);}
+  #editor{
+    width:100%;min-height:460px;background:var(--ink);border:none;border-radius:0;color:var(--text);
+    padding:18px;font-family:var(--mono);font-size:13px;line-height:1.7;resize:vertical;
+  }
+  #editor:focus{outline:none}
+  .preview{padding:20px 22px;min-height:460px;overflow:auto}
+  .preview h1,.preview h2,.preview h3{font-family:var(--disp);font-weight:600;line-height:1.2;margin:1.3em 0 .5em}
+  .preview h1{font-size:26px;color:var(--text)} .preview h2{font-size:21px} .preview h3{font-size:17px}
+  .preview p{margin:.7em 0;color:var(--text)}
+  .preview blockquote{border-left:3px solid var(--acc);margin:.8em 0;padding:.2em 0 .2em 16px;color:var(--muted);font-style:italic}
+  .preview code{font-family:var(--mono);background:var(--ink3);padding:1px 5px;border-radius:2px;font-size:.9em}
+  .preview pre{background:var(--ink3);border:1px solid var(--line);padding:14px;border-radius:var(--radius);overflow:auto}
+  .preview pre code{background:none;padding:0}
+  .preview table{border-collapse:collapse;width:100%;margin:.8em 0;font-size:13px}
+  .preview th,.preview td{border:1px solid var(--line2);padding:7px 10px;text-align:left}
+  .preview th{background:var(--ink3)}
+  .preview a{border-bottom:1px solid var(--line2)}
+  .preview .pg{color:var(--acc2);font-family:var(--mono);font-size:.85em}
 
-  /* ---------- progress ---------- */
-  #progressWrap{margin-top:18px;display:none;}
-  #progressWrap.show{display:block;}
-  .progress-line{font-size:13px;color:var(--ink-soft);margin-bottom:8px;font-family:var(--mono);}
-  .bar{height:5px;background:var(--rule);border-radius:3px;overflow:hidden;}
-  .bar > div{height:100%;background:var(--rubric);width:0%;transition:width .3s;}
+  .empty{color:var(--faint);text-align:center;padding:80px 20px;font-family:var(--mono);font-size:13px;line-height:1.9}
+  .empty .g{opacity:.5;margin-bottom:16px}
 
-  /* ---------- output ---------- */
-  #outputWrap{margin-top:26px;display:none;}
-  #outputWrap.show{display:block;}
-  .output-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;}
-  .output-head h2{font-family:var(--serif);font-size:17px;margin:0;font-weight:600;}
-  .output-actions{display:flex;gap:8px;}
-  .ledger{
-    display:flex;border:1px solid var(--rule);border-radius:10px;overflow:hidden;background:#fff;
-  }
-  .ledger-rule{
-    width:22px;flex-shrink:0;background:repeating-linear-gradient(
-      to bottom, var(--rule) 0 1px, transparent 1px 22px
-    );border-right:1px solid var(--rule);
-  }
-  #preview{
-    flex:1;padding:22px 26px;max-height:62vh;overflow:auto;
-    font-family:var(--serif);font-size:15.5px;line-height:1.7;color:var(--ink);
-  }
-  #preview[data-mode="raw"]{font-family:var(--mono);font-size:13px;white-space:pre-wrap;color:var(--ink-soft);}
-  #preview .pagemark{color:var(--rubric);font-family:var(--mono);font-size:.78em;font-style:normal;vertical-align:2px;}
-  #preview h1,#preview h2,#preview h3{font-family:var(--serif);}
-  #preview table{border-collapse:collapse;width:100%;font-size:14px;}
-  #preview table th, #preview table td{border:1px solid var(--rule-strong);padding:6px 9px;}
-  #preview blockquote{border-left:3px solid var(--rule-strong);margin:0;padding-left:14px;color:var(--ink-soft);}
-  #preview code{background:var(--paper-dim);padding:1px 5px;border-radius:4px;font-family:var(--mono);font-size:.88em;}
+  /* modal */
+  .modal-bg{position:fixed;inset:0;background:rgba(6,8,11,.72);backdrop-filter:blur(3px);z-index:50;display:none;align-items:flex-start;justify-content:center;padding:40px 16px;overflow:auto}
+  .modal-bg.on{display:flex}
+  .modal{background:var(--ink2);border:1px solid var(--line2);border-radius:var(--radius);max-width:560px;width:100%}
+  .modal-h{display:flex;align-items:center;padding:16px 18px;border-bottom:1px solid var(--line);font-family:var(--disp);font-size:18px;font-weight:600}
+  .modal-h .x{margin-left:auto;background:none;border:none;color:var(--faint);font-size:20px}
+  .modal-h .x:hover{color:var(--text)}
+  .modal-b{padding:18px}
+  .prov{border:1px solid var(--line);border-radius:var(--radius);margin-bottom:9px;overflow:hidden}
+  .prov-h{display:flex;align-items:center;gap:10px;padding:11px 13px;background:var(--ink3)}
+  .prov-h .drag{color:var(--faint);cursor:grab;font-family:var(--mono);font-size:13px}
+  .prov-h .nm{font-weight:600;font-size:14px}
+  .prov-h .md{font-family:var(--mono);font-size:10.5px;color:var(--faint);margin-left:2px}
+  .prov-h .tg{margin-left:auto;font-family:var(--mono);font-size:10px;padding:2px 7px;border-radius:99px}
+  .tg.set{background:rgba(127,214,194,.14);color:var(--ok)}
+  .tg.unset{background:rgba(90,103,121,.18);color:var(--faint)}
+  .prov-b{padding:11px 13px;border-top:1px solid var(--line)}
+  .prov-b .kk{display:flex;gap:8px;align-items:center}
+  .prov-b input{font-family:var(--mono);font-size:12px}
+  .arrows{display:flex;flex-direction:column;gap:1px}
+  .arrows button{background:var(--ink);border:1px solid var(--line);color:var(--muted);width:22px;height:16px;line-height:1;font-size:9px;border-radius:2px}
+  .arrows button:hover{color:var(--acc);border-color:var(--acc)}
+  .note{font-size:12px;color:var(--muted);font-family:var(--mono);line-height:1.7;margin-top:4px}
+  .note a{border-bottom:1px solid var(--line2)}
 
-  /* ---------- settings modal ---------- */
-  dialog#settingsModal{
-    border:none;border-radius:12px;padding:0;width:min(560px, 92vw);
-    box-shadow:0 12px 40px rgba(0,0,0,.25);
-  }
-  dialog#settingsModal::backdrop{background:rgba(34,32,28,.45);}
-  .modal-inner{padding:24px 26px 26px;}
-  .modal-inner h2{font-family:var(--serif);font-size:19px;margin:0 0 4px;}
-  .modal-inner p.sub{font-size:13px;color:var(--graphite);margin:0 0 20px;}
-  .provider-block{border:1px solid var(--rule);border-radius:9px;padding:16px;margin-bottom:14px;}
-  .provider-block h3{font-family:var(--serif);font-size:15px;margin:0 0 3px;display:flex;align-items:center;gap:8px;}
-  .provider-block .badge{
-    font-size:10.5px;font-weight:600;letter-spacing:.03em;
-    background:var(--moss);color:#fff;padding:2px 7px;border-radius:20px;
-  }
-  .provider-block p.desc{font-size:12.5px;color:var(--graphite);margin:0 0 12px;line-height:1.5;}
-  .modal-foot{display:flex;justify-content:space-between;align-items:center;margin-top:18px;}
-  fieldset{border:none;padding:0;margin:0;}
+  .toast{position:fixed;bottom:22px;left:50%;transform:translateX(-50%);background:var(--ink3);border:1px solid var(--acc);color:var(--text);padding:11px 18px;border-radius:var(--radius);font-family:var(--mono);font-size:12.5px;z-index:99;opacity:0;transition:.25s;pointer-events:none}
+  .toast.on{opacity:1}
 
-  footer{max-width:920px;margin:8px auto 60px;padding:0 20px;font-size:12px;color:var(--graphite);line-height:1.6;}
-
-  @media (max-width:640px){
-    .ledger-rule{display:none;}
-    #preview{padding:16px;}
-  }
+  footer{border-top:1px solid var(--line);padding:22px 0 40px;font-family:var(--mono);font-size:11px;color:var(--faint);letter-spacing:.3px}
+  footer .wrap{display:flex;gap:16px;flex-wrap:wrap;align-items:center}
+  .kbd{font-family:var(--mono);font-size:10px;background:var(--ink3);border:1px solid var(--line);padding:1px 5px;border-radius:2px;color:var(--muted)}
 </style>
 </head>
 <body>
 
-<header class="app-header">
-  <h1>Escriba<span class="mark">manuscrito → md</span></h1>
-  <button class="icon-btn" id="openSettings" title="Configurações" aria-label="Configurações">⚙</button>
-</header>
-
-<main>
-  <nav class="tabs" role="tablist">
-    <button class="active" data-tab="pdf" role="tab"><span class="n">01</span>PDF</button>
-    <button data-tab="youtube" role="tab"><span class="n">02</span>YouTube</button>
-    <button data-tab="site" role="tab"><span class="n">03</span>Site</button>
-  </nav>
-
-  <!-- PDF -->
-  <section class="panel active" id="panel-pdf">
-    <div class="card">
-      <div class="drop" id="dropZone">
-        <strong>Solte um PDF aqui ou clique para escolher</strong>
-        <small>Transcrição integral, com negrito, itálico, notas de rodapé e número de página entre colchetes.</small>
-        <input type="file" id="pdfInput" accept="application/pdf">
-      </div>
-      <div class="notice" id="pdfProviderNotice"></div>
+<header class="top"><div class="wrap">
+  <div class="brand">
+    <svg class="glyph" viewBox="0 0 32 32" fill="none">
+      <!-- askesis mark: a disciplined stylus stroke forming an 'A' from a page corner -->
+      <rect x="2" y="2" width="28" height="28" rx="2" stroke="#2a3340" stroke-width="1.5"/>
+      <path d="M9 24 L16 7 L23 24" stroke="#7fd6c2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+      <path d="M12.2 17 L19.8 17" stroke="#c9a86a" stroke-width="2" stroke-linecap="round"/>
+      <circle cx="16" cy="7" r="1.6" fill="#7fd6c2"/>
+    </svg>
+    <div>
+      <div class="name"><b>Askesis</b> Transcription</div>
+      <div class="sub">local · markdown · byok</div>
     </div>
-  </section>
+  </div>
+  <div class="spacer"></div>
+  <button class="ghost-btn" id="btnKeys">⚿ Chaves de IA</button>
+</div></header>
 
-  <!-- YouTube -->
-  <section class="panel" id="panel-youtube">
-    <div class="card">
-      <label class="field">
-        <span class="lbl">Endereço do vídeo</span>
-        <div class="row">
-          <input type="url" id="ytUrl" placeholder="https://www.youtube.com/watch?v=...">
-          <button class="primary" id="ytGo" style="flex:0 0 auto;">Transcrever</button>
+<div class="privacy"><div class="wrap">
+  <span class="dot"></span>
+  <span><b>Extração 100% local.</b> Arquivos e PDFs são lidos no seu navegador — nada é enviado ao app.</span>
+  <span style="color:var(--line2)">│</span>
+  <span>A IA é chamada direto do seu navegador ao provedor que você escolher, com <b>suas chaves</b>.</span>
+</div></div>
+
+<section class="hero"><div class="wrap">
+  <div class="eyebrow">práctica · disciplina · texto limpo</div>
+  <h1>Transcreva qualquer fonte em <em>Markdown</em> — e deixe a IA organizar.</h1>
+  <p>Cole um link ou solte um arquivo. O texto é extraído localmente, com marcadores de página preservados. Depois, opcionalmente, uma IA reescreve a estrutura sem tocar no conteúdo.</p>
+</div></section>
+
+<div class="wrap"><div class="cols">
+
+  <!-- LEFT: input -->
+  <div>
+    <div class="panel">
+      <div class="panel-h"><span class="n">01</span> Fonte</div>
+      <div class="panel-b">
+        <div class="tabs">
+          <button class="tab on" data-src="url">Link</button>
+          <button class="tab" data-src="file">Arquivo</button>
         </div>
-      </label>
-      <div class="notice" id="ytNotice"></div>
-    </div>
-  </section>
 
-  <!-- Site -->
-  <section class="panel" id="panel-site">
-    <div class="card">
-      <label class="field">
-        <span class="lbl">Endereço da página</span>
-        <div class="row">
-          <input type="url" id="siteUrl" placeholder="https://exemplo.com/artigo">
-          <button class="primary" id="siteGo" style="flex:0 0 auto;">Transcrever</button>
+        <div id="srcUrl">
+          <label class="fld">URL da página</label>
+          <input type="url" id="urlInput" placeholder="https://exemplo.com/artigo" />
+          <div class="note">Tenta buscar direto; se o site bloquear (CORS), usa um leitor-proxy público. <b>Nesse caso a URL passa por um terceiro</b> — a única exceção ao "local".</div>
+          <div style="height:12px"></div>
+          <button class="btn" id="btnFetch">⟶ Transcrever link</button>
         </div>
-      </label>
-      <div class="notice" id="siteNotice"></div>
-    </div>
-  </section>
 
-  <div id="progressWrap">
-    <div class="progress-line" id="progressLine">Processando…</div>
-    <div class="bar"><div id="progressBar"></div></div>
-  </div>
+        <div id="srcFile" style="display:none">
+          <div class="drop" id="drop">
+            <div class="big">Solte um arquivo aqui</div>
+            <div class="small">PDF · DOCX · DOC · EPUB · HTML · TXT · MD</div>
+          </div>
+          <input type="file" id="fileInput" style="display:none" accept=".pdf,.docx,.doc,.epub,.html,.htm,.txt,.md,.markdown" />
+          <div class="note">Tudo processado no navegador. <b>.doc</b> antigo é best-effort e pode falhar — prefira .docx.</div>
+        </div>
 
-  <div id="outputWrap">
-    <div class="output-head">
-      <h2>Transcrição</h2>
-      <div class="output-actions">
-        <button class="ghost" id="toggleRaw">Ver markdown puro</button>
-        <button class="ghost" id="copyBtn">Copiar</button>
-        <button class="ghost" id="downloadBtn">Baixar .md</button>
+        <div class="prog" id="progBox" style="display:none">
+          <div class="lbl"><span id="progLbl">—</span><span id="progPct">0%</span></div>
+          <div class="bar"><i id="progBar"></i></div>
+        </div>
+        <div class="log" id="log"></div>
       </div>
     </div>
-    <div class="ledger">
-      <div class="ledger-rule"></div>
-      <div id="preview" data-mode="rendered"></div>
-    </div>
-  </div>
 
-  <div class="notice" id="globalError" style="display:none;background:#FBF3EF;border-left-color:var(--rubric);"></div>
-</main>
+    <div style="height:20px"></div>
 
-<footer>
-  Os arquivos e chaves de API ficam só no seu navegador (localStorage). Nada passa por servidor próprio — cada transcrição chama diretamente a API do provedor escolhido.
-</footer>
-
-<!-- ---------- settings modal ---------- -->
-<dialog id="settingsModal">
-  <div class="modal-inner">
-    <h2>Configurações</h2>
-    <p class="sub">Escolha o provedor de IA e informe sua própria chave de API. Você pode configurar mais de um.</p>
-
-    <div class="provider-block">
-      <h3>Google Gemini <span class="badge">tem nível gratuito</span></h3>
-      <p class="desc">Único provedor que lê PDF, vídeo do YouTube e páginas da web de forma nativa (sem bloqueios de CORS). Recomendado como padrão. Chave grátis em aistudio.google.com.</p>
-      <label class="field"><span class="lbl">Chave de API</span><input type="password" id="geminiKey" placeholder="AIza..."></label>
-      <label class="field"><span class="lbl">Modelo</span><input type="text" id="geminiModel" placeholder="gemini-2.5-flash"></label>
-    </div>
-
-    <div class="provider-block">
-      <h3>Anthropic Claude</h3>
-      <p class="desc">Boa leitura de PDF (inclusive digitalizados). Não busca vídeos do YouTube nem páginas da web por conta própria — use o Gemini para essas duas abas.</p>
-      <label class="field"><span class="lbl">Chave de API</span><input type="password" id="claudeKey" placeholder="sk-ant-..."></label>
-      <label class="field"><span class="lbl">Modelo</span><input type="text" id="claudeModel" placeholder="claude-sonnet-4-6"></label>
-    </div>
-
-    <div class="provider-block">
-      <h3>Endpoint personalizado</h3>
-      <p class="desc">Qualquer API compatível com o formato de chat da OpenAI (ex.: OpenAI, Groq, OpenRouter). Precisa aceitar imagens (visão) para transcrever PDF.</p>
-      <label class="field"><span class="lbl">URL do endpoint</span><input type="text" id="customEndpoint" placeholder="https://api.openai.com/v1/chat/completions"></label>
-      <label class="field"><span class="lbl">Chave de API</span><input type="password" id="customKey" placeholder="sk-..."></label>
-      <label class="field"><span class="lbl">Modelo</span><input type="text" id="customModel" placeholder="gpt-4o"></label>
-    </div>
-
-    <label class="field">
-      <span class="lbl">Provedor a usar para PDF</span>
-      <select id="pdfProviderSelect">
-        <option value="gemini">Google Gemini</option>
-        <option value="claude">Anthropic Claude</option>
-        <option value="custom">Endpoint personalizado</option>
-      </select>
-    </label>
-
-    <div class="modal-foot">
-      <span style="font-size:12px;color:var(--graphite);">Salvo só neste navegador.</span>
-      <div style="display:flex;gap:8px;">
-        <button class="ghost" id="closeSettings">Fechar</button>
-        <button class="primary" id="saveSettings">Salvar</button>
+    <div class="panel">
+      <div class="panel-h"><span class="n">02</span> Organizar com IA</div>
+      <div class="panel-b">
+        <div class="note" style="margin-top:0;margin-bottom:12px">
+          Detecta o idioma e responde nele. Mantém <span style="color:var(--acc2)">[p. N]</span>, remove cabeçalhos repetidos, junta hifenização e parágrafos quebrados, aplica hierarquia de títulos, citações em bloco, notas de rodapé e preserva listas/tabelas/código/fórmulas.
+        </div>
+        <div class="row">
+          <button class="btn brass" id="btnOrg" disabled>✦ Organizar texto atual</button>
+          <button class="btn sec" id="btnRedo" disabled title="Reprocessa a partir do texto bruto original, sem reenviar o arquivo">↺ Refazer do bruto</button>
+        </div>
+        <div class="prog" id="aiProgBox" style="display:none">
+          <div class="lbl"><span id="aiProgLbl">—</span><span id="aiProgPct">0%</span></div>
+          <div class="bar"><i id="aiProgBar"></i></div>
+        </div>
+        <div class="log" id="aiLog"></div>
       </div>
     </div>
   </div>
-</dialog>
+
+  <!-- RIGHT: editor -->
+  <div class="panel ed-wrap">
+    <div class="panel-h">
+      <span class="n">03</span> Markdown
+      <div style="margin-left:auto;display:flex;gap:2px" class="tabs" id="viewTabs" style="margin:0">
+      </div>
+    </div>
+    <div class="ed-toolbar">
+      <button class="mini" data-view="edit">✎ Editar</button>
+      <button class="mini" data-view="prev">◉ Prévia</button>
+      <div style="flex:1"></div>
+      <button class="mini" id="btnCopy" disabled>⧉ Copiar</button>
+      <button class="mini" id="btnDl" disabled>⭳ Baixar .md</button>
+    </div>
+    <div class="fname-bar">
+      <div class="ff">
+        <label class="fld">Autor</label>
+        <input type="text" id="mAuthor" placeholder="detectado…" />
+      </div>
+      <div class="ff">
+        <label class="fld">Título</label>
+        <input type="text" id="mTitle" placeholder="detectado…" />
+      </div>
+      <div class="fn">
+        <label class="fld">Nome do arquivo</label>
+        <code id="fnameHint">—</code>
+      </div>
+    </div>
+    <textarea id="editor" placeholder="O Markdown transcrito aparece aqui — e fica editável." style="display:none"></textarea>
+    <div class="preview" id="preview">
+      <div class="empty">
+        <div class="g">
+          <svg width="46" height="46" viewBox="0 0 32 32" fill="none" style="opacity:.6">
+            <path d="M9 24 L16 7 L23 24" stroke="#7fd6c2" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"/>
+            <path d="M12.2 17 L19.8 17" stroke="#c9a86a" stroke-width="2" stroke-linecap="round"/>
+          </svg>
+        </div>
+        Nenhuma transcrição ainda.<br>Escolha uma fonte à esquerda para começar.
+      </div>
+    </div>
+  </div>
+
+</div></div>
+
+<footer><div class="wrap">
+  <span>ASKESIS · v1.0</span>
+  <span>·</span>
+  <span>Extração local · BYOK · sem backend de IA</span>
+  <span>·</span>
+  <span><span class="kbd">Ctrl</span>+<span class="kbd">S</span> baixar</span>
+</div></footer>
+
+<!-- KEYS MODAL -->
+<div class="modal-bg" id="keysModal"><div class="modal">
+  <div class="modal-h">Chaves de IA (BYOK)<button class="x" id="keysX">×</button></div>
+  <div class="modal-b">
+    <div class="note" style="margin-top:0;margin-bottom:14px">
+      Chaves ficam <b>só no localStorage</b> deste navegador. A ordem define o <b>fallback</b>: se um provedor falhar (cota, limite, erro), o próximo é tentado. Todos têm camada gratuita.
+    </div>
+    <div id="provList"></div>
+  </div>
+</div></div>
+
+<div class="toast" id="toast"></div>
+
+<!-- libs (client-side extraction) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/mammoth/1.6.0/mammoth.browser.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/turndown/7.1.2/turndown.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/11.1.1/marked.min.js"></script>
 
 <script>
 /* =========================================================
-   PWA: manifest embutido (data URI) + service worker via Blob
+   Askesis Transcription — single-file client app
    ========================================================= */
-(function setupPWA(){
-  const manifest = {
-    name: "Escriba — transcrição para Markdown",
-    short_name: "Escriba",
-    start_url: ".",
-    display: "standalone",
-    background_color: "#FAF7F0",
-    theme_color: "#22201C",
-    icons: [{
-      src: "data:image/svg+xml;base64," + btoa("<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='14' fill='#22201c'/><path d='M28 74 L50 22 L72 74 M36 56 H64' stroke='#A63D2F' stroke-width='6' fill='none' stroke-linecap='round' stroke-linejoin='round'/></svg>"),
-      sizes: "192x192 512x512",
-      type: "image/svg+xml",
-      purpose: "any"
-    }]
-  };
-  const manifestBlob = new Blob([JSON.stringify(manifest)], {type:"application/manifest+json"});
-  document.getElementById("manifestLink").href = URL.createObjectURL(manifestBlob);
+if(window.pdfjsLib) pdfjsLib.GlobalWorkerOptions.workerSrc =
+  'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
 
-  if ("serviceWorker" in navigator){
-    const swCode = `
-      self.addEventListener('install', e => self.skipWaiting());
-      self.addEventListener('activate', e => self.clients.claim());
-      self.addEventListener('fetch', e => {});
-    `;
-    try{
-      const swBlob = new Blob([swCode], {type:"application/javascript"});
-      navigator.serviceWorker.register(URL.createObjectURL(swBlob)).catch(()=>{});
-    }catch(e){ /* alguns navegadores bloqueiam SW via blob URL; instalação como PWA pode não ficar disponível nesse caso */ }
-  }
-})();
+const $ = s => document.querySelector(s);
+const el = (id)=>document.getElementById(id);
 
-/* =========================================================
-   Configurações (localStorage)
-   ========================================================= */
-const cfg = {
-  load(){
-    return {
-      geminiKey: localStorage.getItem("escriba.geminiKey") || "",
-      geminiModel: localStorage.getItem("escriba.geminiModel") || "gemini-2.5-flash",
-      claudeKey: localStorage.getItem("escriba.claudeKey") || "",
-      claudeModel: localStorage.getItem("escriba.claudeModel") || "claude-sonnet-4-6",
-      customEndpoint: localStorage.getItem("escriba.customEndpoint") || "",
-      customKey: localStorage.getItem("escriba.customKey") || "",
-      customModel: localStorage.getItem("escriba.customModel") || "",
-      pdfProvider: localStorage.getItem("escriba.pdfProvider") || "gemini",
-    };
-  },
-  save(v){
-    localStorage.setItem("escriba.geminiKey", v.geminiKey);
-    localStorage.setItem("escriba.geminiModel", v.geminiModel);
-    localStorage.setItem("escriba.claudeKey", v.claudeKey);
-    localStorage.setItem("escriba.claudeModel", v.claudeModel);
-    localStorage.setItem("escriba.customEndpoint", v.customEndpoint);
-    localStorage.setItem("escriba.customKey", v.customKey);
-    localStorage.setItem("escriba.customModel", v.customModel);
-    localStorage.setItem("escriba.pdfProvider", v.pdfProvider);
-  }
-};
+/* ---------- state ---------- */
+let rawMd = '';       // texto bruto original (para "refazer do bruto")
+let currentMd = '';   // texto atual no editor
+let meta = {author:'', title:''};  // metadados p/ nome do arquivo
+const LS_KEYS = 'askesis.keys.v1';
 
-const modal = document.getElementById("settingsModal");
-function fillModalFromStorage(){
-  const v = cfg.load();
-  document.getElementById("geminiKey").value = v.geminiKey;
-  document.getElementById("geminiModel").value = v.geminiModel;
-  document.getElementById("claudeKey").value = v.claudeKey;
-  document.getElementById("claudeModel").value = v.claudeModel;
-  document.getElementById("customEndpoint").value = v.customEndpoint;
-  document.getElementById("customKey").value = v.customKey;
-  document.getElementById("customModel").value = v.customModel;
-  document.getElementById("pdfProviderSelect").value = v.pdfProvider;
+/* ---------- metadata → filename ---------- */
+function setMeta(m){
+  meta = {author:(m.author||'').trim(), title:(m.title||'').trim()};
+  updateFilenameUI();
 }
-document.getElementById("openSettings").addEventListener("click", ()=>{ fillModalFromStorage(); modal.showModal(); });
-document.getElementById("closeSettings").addEventListener("click", ()=> modal.close());
-document.getElementById("saveSettings").addEventListener("click", ()=>{
-  cfg.save({
-    geminiKey: document.getElementById("geminiKey").value.trim(),
-    geminiModel: document.getElementById("geminiModel").value.trim() || "gemini-2.5-flash",
-    claudeKey: document.getElementById("claudeKey").value.trim(),
-    claudeModel: document.getElementById("claudeModel").value.trim() || "claude-sonnet-4-6",
-    customEndpoint: document.getElementById("customEndpoint").value.trim(),
-    customKey: document.getElementById("customKey").value.trim(),
-    customModel: document.getElementById("customModel").value.trim(),
-    pdfProvider: document.getElementById("pdfProviderSelect").value,
-  });
-  modal.close();
-  refreshNotices();
-});
-
-/* first run: open settings automatically if nothing configured */
-window.addEventListener("load", ()=>{
-  const v = cfg.load();
-  if (!v.geminiKey && !v.claudeKey && !v.customEndpoint){
-    fillModalFromStorage();
-    modal.showModal();
-  }
-  refreshNotices();
-});
-
-function refreshNotices(){
-  const v = cfg.load();
-  const pdfNotice = document.getElementById("pdfProviderNotice");
-  const provNames = {gemini:"Google Gemini", claude:"Anthropic Claude", custom:"endpoint personalizado"};
-  pdfNotice.textContent = `Provedor atual para PDF: ${provNames[v.pdfProvider]}. Altere em Configurações (⚙).`;
-
-  const ytNotice = document.getElementById("ytNotice");
-  const siteNotice = document.getElementById("siteNotice");
-  if (v.geminiKey){
-    ytNotice.textContent = "Usa o Gemini para assistir e transcrever o vídeo, com marcações de tempo entre colchetes.";
-    siteNotice.textContent = "Usa o Gemini para buscar e organizar o conteúdo integral da página.";
-  } else {
-    ytNotice.innerHTML = "Este recurso só funciona com uma chave do <strong>Google Gemini</strong> configurada (é o único provedor que lê vídeos do YouTube nativamente). Abra as Configurações (⚙) e informe a chave.";
-    siteNotice.innerHTML = "Este recurso só funciona com uma chave do <strong>Google Gemini</strong> configurada (é o único provedor com busca de páginas web embutida). Abra as Configurações (⚙) e informe a chave.";
-    ytNotice.parentElement.classList.add("block");
-    siteNotice.parentElement.classList.add("block");
-  }
+// remove acentos, pontuação; junta palavras com hífen (Title-Case preservado)
+function slug(s){
+  return (s||'')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g,'')   // acentos
+    .replace(/["'’“”«»]/g,'')
+    .replace(/[^A-Za-z0-9]+/g,'-')                      // tudo vira hífen
+    .replace(/-{2,}/g,'-')
+    .replace(/^-+|-+$/g,'')
+    .slice(0,110);
 }
-
-/* =========================================================
-   Tabs
-   ========================================================= */
-document.querySelectorAll("nav.tabs button").forEach(btn=>{
-  btn.addEventListener("click", ()=>{
-    document.querySelectorAll("nav.tabs button").forEach(b=>b.classList.remove("active"));
-    document.querySelectorAll("section.panel").forEach(p=>p.classList.remove("active"));
-    btn.classList.add("active");
-    document.getElementById("panel-"+btn.dataset.tab).classList.add("active");
-  });
-});
-
-/* =========================================================
-   Chamadas às APIs (visão: imagens + texto)
-   Aceita `parts`: [{type:'text',text} | {type:'image',mimeType,base64}], em ordem —
-   usado no modo híbrido de PDF para intercalar texto nativo + imagem por página.
-   Também aceita a forma antiga (prompt + images) para os fluxos de YouTube/site.
-   ========================================================= */
-function buildOrderedParts(prompt, images, parts){
-  if (parts) return parts;
-  const out = [{type:"text", text: prompt}];
-  if (images) images.forEach(img => out.push({type:"image", mimeType: img.mimeType, base64: img.base64}));
+// tenta descobrir autor/título a partir do próprio Markdown, se faltar
+function inferMetaFromMd(md){
+  const out={author:meta.author,title:meta.title};
+  const lines=md.split('\n').map(l=>l.trim()).filter(Boolean).slice(0,12);
+  if(!out.title){
+    const h1=lines.find(l=>/^#\s+\S/.test(l));
+    if(h1) out.title=h1.replace(/^#\s+/,'').trim();
+    else if(lines[0] && lines[0].length<120) out.title=lines[0].replace(/^#+\s*/,'');
+  }
+  if(!out.author){
+    const re=/^(?:\*{0,2}(?:por|by|autor(?:a)?|author)\*{0,2}\s*[:\-–]?\s*)(.{2,80})$/i;
+    for(const l of lines){
+      const m=l.replace(/^[#>*_\s]+/,'').match(re);
+      if(m){out.author=m[1].replace(/[*_]/g,'').trim();break;}
+    }
+  }
   return out;
 }
-
-async function callGemini({apiKey, model, prompt, images, parts, useUrlContext, fileUri, videoRange, lowRes, maxOutputTokens}){
-  const ordered = buildOrderedParts(prompt, images, parts);
-  const geminiParts = ordered.map(p => p.type === "image"
-    ? {inlineData:{mimeType: p.mimeType, data: p.base64}}
-    : {text: p.text});
-  if (fileUri){
-    const videoPart = {fileData:{fileUri}};
-    if (videoRange) videoPart.videoMetadata = { startOffset:{seconds: videoRange.startSec}, endOffset:{seconds: videoRange.endSec} };
-    geminiParts.push(videoPart);
-  }
-  const generationConfig = { maxOutputTokens: maxOutputTokens || 8192 };
-  if (lowRes) generationConfig.mediaResolution = "MEDIA_RESOLUTION_LOW";
-  const body = { contents:[{parts: geminiParts}], generationConfig };
-  if (useUrlContext) body.tools = [{url_context:{}}];
-  const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`, {
-    method:"POST",
-    headers:{ "Content-Type":"application/json", "x-goog-api-key": apiKey },
-    body: JSON.stringify(body)
-  });
-  if (!res.ok){
-    const errText = (await res.text()).slice(0,300);
-    const err = new Error("Gemini: " + res.status + " " + errText);
-    if (/exceeds the maximum number of tokens/i.test(errText)) err.tokenLimitExceeded = true;
-    throw err;
-  }
-  const data = await res.json();
-  const cand = data.candidates && data.candidates[0];
-  if (!cand) throw new Error("Gemini não retornou nenhum candidato de resposta (possível bloqueio de segurança ou URL inacessível).");
-  if (!cand.content || !Array.isArray(cand.content.parts) || cand.content.parts.length === 0){
-    const motivos = {
-      SAFETY: "bloqueio por filtro de segurança",
-      RECITATION: "bloqueio por suspeita de reprodução de conteúdo protegido",
-      MAX_TOKENS: "resposta cortada por limite de tokens de saída",
-      OTHER: "motivo não especificado pela API"
-    };
-    const reason = cand.finishReason || "OTHER";
-    throw new Error(`Gemini não retornou texto para este trecho (${motivos[reason] || reason}). Tente novamente ou, se persistir, reduza o lote de páginas.`);
-  }
-  return cand.content.parts.map(p=>p.text||"").join("\n");
+function buildFilename(){
+  const m=inferMetaFromMd(el('editor').value||'');
+  // campos editáveis vencem sobre a detecção automática
+  const ma=el('mAuthor')?.value.trim(), mt=el('mTitle')?.value.trim();
+  const a=slug(ma||m.author), t=slug(mt||m.title);
+  if(a&&t) return `${a}-${t}.md`;
+  if(t)     return `${t}.md`;
+  if(a)     return `${a}.md`;
+  return 'askesis-'+Date.now()+'.md';
+}
+function updateFilenameUI(){
+  const b=el('fnameHint'); if(!b) return;
+  const ai=el('mAuthor'), ti=el('mTitle');
+  // reflete o que foi detectado (sem apagar edição manual do usuário)
+  if(ai && document.activeElement!==ai && meta.author) ai.value=meta.author;
+  if(ti && document.activeElement!==ti && meta.title)  ti.value=meta.title;
+  const has=(el('editor').value||'').trim().length>0;
+  b.textContent = has ? buildFilename() : '—';
 }
 
-async function callClaude({apiKey, model, prompt, images, parts}){
-  const ordered = buildOrderedParts(prompt, images, parts);
-  const content = ordered.map(p => p.type === "image"
-    ? {type:"image", source:{type:"base64", media_type: p.mimeType, data: p.base64}}
-    : {type:"text", text: p.text});
-  const res = await fetch("https://api.anthropic.com/v1/messages", {
-    method:"POST",
-    headers:{
-      "Content-Type":"application/json",
-      "x-api-key": apiKey,
-      "anthropic-version":"2023-06-01",
-      "anthropic-dangerous-direct-browser-access":"true"
-    },
-    body: JSON.stringify({ model, max_tokens: 8000, messages:[{role:"user", content}] })
-  });
-  if (!res.ok) throw new Error("Claude: " + res.status + " " + (await res.text()).slice(0,300));
-  const data = await res.json();
-  return (data.content||[]).map(b=>b.text||"").join("\n");
-}
+/* ---------- providers ---------- */
+const PROVIDERS = {
+  gemini:   {name:'Google Gemini',  model:'gemini-1.5-flash-latest', hint:'aistudio.google.com/apikey'},
+  groq:     {name:'Groq',           model:'llama-3.3-70b-versatile', hint:'console.groq.com/keys'},
+  openrouter:{name:'OpenRouter',    model:'meta-llama/llama-3.3-70b-instruct:free', hint:'openrouter.ai/keys'},
+  mistral:  {name:'Mistral AI',     model:'mistral-large-latest', hint:'console.mistral.ai/api-keys'},
+  cerebras: {name:'Cerebras',       model:'llama-3.3-70b', hint:'cloud.cerebras.ai'},
+  kimi:     {name:'Kimi (Moonshot)',model:'moonshot-v1-8k', hint:'platform.moonshot.ai'},
+};
+const DEFAULT_ORDER = ['gemini','groq','openrouter','mistral','cerebras','kimi'];
 
-async function callCustomOpenAI({endpoint, apiKey, model, prompt, images, parts}){
-  const ordered = buildOrderedParts(prompt, images, parts);
-  const content = ordered.map(p => p.type === "image"
-    ? {type:"image_url", image_url:{url:`data:${p.mimeType};base64,${p.base64}`}}
-    : {type:"text", text: p.text});
-  const res = await fetch(endpoint, {
-    method:"POST",
-    headers:{ "Content-Type":"application/json", "Authorization":"Bearer " + apiKey },
-    body: JSON.stringify({ model, messages:[{role:"user", content}] })
-  });
-  if (!res.ok) throw new Error("Endpoint personalizado: " + res.status + " " + (await res.text()).slice(0,300));
-  const data = await res.json();
-  return data.choices?.[0]?.message?.content || "";
+function loadKeys(){
+  try{return JSON.parse(localStorage.getItem(LS_KEYS))||{order:DEFAULT_ORDER.slice(),keys:{}};}
+  catch{return {order:DEFAULT_ORDER.slice(),keys:{}};}
 }
+function saveKeys(k){localStorage.setItem(LS_KEYS,JSON.stringify(k));}
+let cfg = loadKeys();
 
-async function callProviderVision(provider, {prompt, images, parts}){
-  const v = cfg.load();
-  if (provider === "gemini") return callGemini({apiKey:v.geminiKey, model:v.geminiModel, prompt, images, parts});
-  if (provider === "claude") return callClaude({apiKey:v.claudeKey, model:v.claudeModel, prompt, images, parts});
-  return callCustomOpenAI({endpoint:v.customEndpoint, apiKey:v.customKey, model:v.customModel, prompt, images, parts});
+/* ---------- UI helpers ---------- */
+function toast(msg){const t=el('toast');t.textContent=msg;t.classList.add('on');clearTimeout(t._t);t._t=setTimeout(()=>t.classList.remove('on'),2200);}
+function logLine(where,msg,cls=''){const box=el(where);const d=document.createElement('div');if(cls)d.className=cls;d.textContent='› '+msg;box.appendChild(d);box.scrollTop=box.scrollHeight;}
+function clearLog(where){el(where).innerHTML='';}
+function setProg(which,lbl,pct){
+  const p={src:['progBox','progLbl','progBar','progPct'],ai:['aiProgBox','aiProgLbl','aiProgBar','aiProgPct']}[which];
+  el(p[0]).style.display='block';el(p[1]).textContent=lbl;el(p[2]).style.width=pct+'%';el(p[3]).textContent=Math.round(pct)+'%';
 }
+function hideProg(which){el(which==='src'?'progBox':'aiProgBox').style.display='none';}
 
-/* =========================================================
-   Progresso / saída
-   ========================================================= */
-const progressWrap = document.getElementById("progressWrap");
-const progressLine = document.getElementById("progressLine");
-const progressBar = document.getElementById("progressBar");
-const outputWrap = document.getElementById("outputWrap");
-const preview = document.getElementById("preview");
-const globalError = document.getElementById("globalError");
-
-function showError(msg){
-  globalError.style.display = "block";
-  globalError.textContent = msg;
+/* ---------- editor render ---------- */
+let view='prev';
+function setMd(md,{isRaw=false}={}){
+  currentMd=md;
+  if(isRaw) rawMd=md;
+  el('editor').value=md;
+  renderPreview();
+  const has=md.trim().length>0;
+  el('btnCopy').disabled=!has;el('btnDl').disabled=!has;
+  el('btnOrg').disabled=!has;el('btnRedo').disabled=!(rawMd.trim().length>0);
+  updateFilenameUI();
 }
-function clearError(){ globalError.style.display = "none"; }
-
-function setProgress(text, pct){
-  progressWrap.classList.add("show");
-  progressLine.textContent = text;
-  progressBar.style.width = pct + "%";
+function renderPreview(){
+  const md=el('editor').value;
+  if(!md.trim()){el('preview').innerHTML='<div class="empty">Vazio.</div>';return;}
+  // highlight [p. N] markers
+  let html=marked.parse(md,{breaks:false});
+  html=html.replace(/\[p\.\s*([\dxiv]+)\]/gi,'<span class="pg">[p. $1]</span>');
+  el('preview').innerHTML=html;
 }
-function hideProgress(){ progressWrap.classList.remove("show"); }
-
-let fullMarkdown = "";
-function renderOutput(){
-  outputWrap.classList.add("show");
-  if (preview.dataset.mode === "raw"){
-    preview.textContent = fullMarkdown;
-  } else {
-    const escaped = fullMarkdown.replace(/\[(\d+)\]/g, '<span class="pagemark">[$1]</span>');
-    preview.innerHTML = marked.parse(escaped);
-  }
+function switchView(v){
+  view=v;
+  el('editor').style.display=v==='edit'?'block':'none';
+  el('preview').style.display=v==='prev'?'block':'none';
+  document.querySelectorAll('[data-view]').forEach(b=>b.classList.toggle('on',b.dataset.view===v));
 }
-document.getElementById("toggleRaw").addEventListener("click", (e)=>{
-  preview.dataset.mode = preview.dataset.mode === "raw" ? "rendered" : "raw";
-  e.target.textContent = preview.dataset.mode === "raw" ? "Ver renderizado" : "Ver markdown puro";
-  renderOutput();
-});
-document.getElementById("copyBtn").addEventListener("click", async ()=>{
-  await navigator.clipboard.writeText(fullMarkdown);
-  const b = document.getElementById("copyBtn");
-  const old = b.textContent; b.textContent = "Copiado!"; setTimeout(()=>b.textContent=old, 1400);
-});
-document.getElementById("downloadBtn").addEventListener("click", ()=>{
-  const blob = new Blob([fullMarkdown], {type:"text/markdown"});
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(blob);
-  a.download = (window.__escribaFileName || "transcricao") + ".md";
-  a.click();
+el('editor').addEventListener('input',()=>{currentMd=el('editor').value;updateFilenameUI();});
+document.querySelectorAll('[data-view]').forEach(b=>b.onclick=()=>switchView(b.dataset.view));
+
+/* ---------- source tab switch ---------- */
+document.querySelectorAll('[data-src]').forEach(b=>b.onclick=()=>{
+  document.querySelectorAll('[data-src]').forEach(x=>x.classList.toggle('on',x===b));
+  el('srcUrl').style.display=b.dataset.src==='url'?'block':'none';
+  el('srcFile').style.display=b.dataset.src==='file'?'block':'none';
 });
 
 /* =========================================================
-   PDF: renderizar páginas em imagens e enviar em lotes
+   EXTRACTION (all client-side)
    ========================================================= */
-try{
-  pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
-}catch(e){
-  console.error("Falha ao carregar pdf.js:", e);
-}
+const td = new TurndownService({headingStyle:'atx',codeBlockStyle:'fenced',bulletListMarker:'-'});
 
-const BATCH_SIZE = 6;      // páginas por chamada de API
-const MAX_DIM = 1600;      // maior lado da imagem renderizada, em px
-const SCAN_THRESHOLD = 25; // caracteres mínimos extraídos p/ considerar a página "digital" (senão, é tratada como escaneada)
-
-async function renderPageToImage(pdf, pageNum){
-  const page = await pdf.getPage(pageNum);
-  const viewport1 = page.getViewport({scale:1});
-  const scale = MAX_DIM / Math.max(viewport1.width, viewport1.height);
-  const viewport = page.getViewport({scale});
-  const canvas = document.createElement("canvas");
-  canvas.width = viewport.width; canvas.height = viewport.height;
-  const ctx = canvas.getContext("2d");
-  await page.render({canvasContext: ctx, viewport}).promise;
-  const dataUrl = canvas.toDataURL("image/jpeg", 0.85);
-  return dataUrl.split(",")[1];
-}
-
-// Extrai o texto nativo da página via pdf.js (exato, mas sem informação de negrito/itálico —
-// a API pública do pdf.js não expõe isso de forma confiável). Detecta títulos pelo tamanho da fonte.
-async function extractPageText(pdf, pageNum){
-  const page = await pdf.getPage(pageNum);
-  const tc = await page.getTextContent();
-  if (!tc.items.length) return {text:"", charCount:0};
-  const heights = tc.items.map(it=>Math.hypot(it.transform[2], it.transform[3])).filter(h=>h>0);
-  heights.sort((a,b)=>a-b);
-  const median = heights[Math.floor(heights.length/2)] || 10;
-
-  let charCount = 0, out = [];
-  let prevItem = null, curLineParts = [], curLineH = 0;
-  function flushLine(){
-    if (curLineParts.length){
-      const text = curLineParts.join("").replace(/[ \t]+/g," ").trim();
-      if (text){
-        charCount += text.length;
-        const ratio = curLineH / median;
-        out.push(ratio > 1.7 ? ("# "+text) : ratio > 1.3 ? ("## "+text) : text);
-      }
-    }
-    curLineParts = []; curLineH = 0;
-  }
-  for (const it of tc.items){
-    if (!it.str && !it.hasEOL) continue;
-    const h = Math.hypot(it.transform[2], it.transform[3]) || median;
-    let str = it.str || "";
-    if (prevItem){
-      const sameLine = Math.abs(it.transform[5] - prevItem.transform[5]) < median * 0.4;
-      if (!sameLine){ flushLine(); curLineH = h; }
-      else {
-        const prevEndX = prevItem.transform[4] + (prevItem.width || 0);
-        const gap = it.transform[4] - prevEndX;
-        if (gap > h * 0.15 && curLineParts.length) curLineParts.push(" ");
-        curLineH = Math.max(curLineH, h);
-      }
-    } else { curLineH = h; }
-    curLineParts.push(str);
-    if (it.hasEOL) flushLine();
-    prevItem = it;
-  }
-  flushLine();
-  return { text: out.join("\n"), charCount };
-}
-
-function hybridIntro(){
-  return `Você vai transcrever páginas de um PDF para Markdown. Para cada página abaixo você recebe, nesta ordem: `+
-    `(1) o texto exato já extraído nativamente do PDF — não tem erro de leitura, use-o literalmente, palavra por palavra, sem reescrever, resumir, corrigir ou adivinhar nada diferente dele; `+
-    `e (2) a imagem da própria página, que serve só para você enxergar a formatação visual (o que está em negrito, itálico, títulos, tabelas, citações, notas de rodapé) e aplicar essa formatação ao texto já fornecido. `+
-    `Quando uma página vier marcada como "sem texto nativo", é porque é uma página escaneada/imagem: nesse caso, transcreva-a integralmente a partir da imagem, normalmente, como OCR. `+
-    `Insira o número de cada página entre colchetes (ex.: [12]) no fluxo natural do texto, exatamente no ponto em que a página muda — nunca como título isolado nem quebrando uma palavra. `+
-    `Notas de rodapé devem virar notas de rodapé em Markdown (ex.: um trecho com nota[^1] e, ao final do conteúdo da respectiva página, a definição "[^1]: texto da nota"). `+
-    `Não adicione comentários, introduções ou observações suas: responda apenas com o markdown transcrito, começando já no conteúdo.`;
-}
-
-function pageLabelText(pageNum, extracted){
-  if (extracted.charCount >= SCAN_THRESHOLD){
-    return `--- Página ${pageNum} — texto nativo extraído (use como base literal) ---\n${extracted.text}`;
-  }
-  return `--- Página ${pageNum} — sem texto nativo (provável página escaneada; transcreva pela imagem) ---`;
-}
-
-// Monta as partes intercaladas (texto nativo + imagem) para um conjunto de páginas
-async function buildHybridParts(pdf, pageNumbers){
-  const parts = [{type:"text", text: hybridIntro()}];
-  for (const p of pageNumbers){
-    const extracted = await extractPageText(pdf, p);
-    parts.push({type:"text", text: pageLabelText(p, extracted)});
-    const b64 = await renderPageToImage(pdf, p);
-    parts.push({type:"image", mimeType:"image/jpeg", base64:b64});
-  }
-  return parts;
-}
-
-async function processPdfFile(file){
-  clearError(); fullMarkdown = ""; window.__escribaFileName = file.name.replace(/\.pdf$/i,"");
-  const v = cfg.load();
-  const provider = v.pdfProvider;
-  if ((provider==="gemini" && !v.geminiKey) || (provider==="claude" && !v.claudeKey) || (provider==="custom" && !v.customEndpoint)){
-    showError("Configure a chave do provedor selecionado para PDF em Configurações (⚙) antes de transcrever.");
-    return;
-  }
+async function fetchUrl(url){
+  clearLog('log');hideProg('src');
+  setProg('src','buscando direto…',15);
+  logLine('log','tentando fetch direto…');
+  let html=null;
   try{
-    const arrayBuf = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({data: arrayBuf}).promise;
-    const total = pdf.numPages;
-    let done = 0;
-    setProgress(`Lendo ${total} página(s)…`, 2);
-
-    const falhas = [];
-    for (let start = 1; start <= total; start += BATCH_SIZE){
-      const end = Math.min(start + BATCH_SIZE - 1, total);
-      const pageNumbers = [];
-      for (let p = start; p <= end; p++) pageNumbers.push(p);
-      setProgress(`Transcrevendo páginas ${start}–${end} de ${total}…`, Math.round((start/total)*100));
-      try{
-        const parts = await buildHybridParts(pdf, pageNumbers);
-        const chunkMd = await callProviderVision(provider, {parts});
-        fullMarkdown += (fullMarkdown ? "\n\n" : "") + chunkMd.trim();
-      }catch(batchErr){
-        // o lote inteiro falhou (bloqueio, corte de tokens, instabilidade da API):
-        // tenta de novo página a página em vez de perder o progresso já feito
-        setProgress(`Lote ${start}–${end} falhou, tentando página a página…`, Math.round((start/total)*100));
-        for (const p of pageNumbers){
-          try{
-            const parts = await buildHybridParts(pdf, [p]);
-            const pageMd = await callProviderVision(provider, {parts});
-            fullMarkdown += (fullMarkdown ? "\n\n" : "") + pageMd.trim();
-          }catch(pageErr){
-            falhas.push(p);
-            fullMarkdown += `\n\n> ⚠️ **[${p}] não foi possível transcrever esta página automaticamente** (${pageErr.message}). Tente processá-la de novo separadamente.\n`;
-          }
-          renderOutput();
-        }
-      }
-      done = end;
-      setProgress(`Transcrevendo páginas ${start}–${end} de ${total}…`, Math.round((done/total)*100));
-      renderOutput();
-    }
-    if (falhas.length){
-      setProgress(`Concluído com ${falhas.length} página(s) pendente(s): ${falhas.join(", ")}.`, 100);
-    } else {
-      setProgress(`Concluído — ${total} página(s).`, 100);
-    }
-    setTimeout(hideProgress, 2500);
-  }catch(err){
-    hideProgress();
-    showError("Falha na transcrição do PDF: " + err.message + " — o texto já transcrito até aqui continua disponível abaixo.");
-  }
-}
-
-const dropZone = document.getElementById("dropZone");
-const pdfInput = document.getElementById("pdfInput");
-dropZone.addEventListener("click", ()=> pdfInput.click());
-pdfInput.addEventListener("change", ()=>{ if (pdfInput.files[0]) processPdfFile(pdfInput.files[0]); });
-["dragenter","dragover"].forEach(evt=> dropZone.addEventListener(evt, e=>{ e.preventDefault(); dropZone.classList.add("drag"); }));
-["dragleave","drop"].forEach(evt=> dropZone.addEventListener(evt, e=>{ e.preventDefault(); dropZone.classList.remove("drag"); }));
-dropZone.addEventListener("drop", e=>{
-  const f = e.dataTransfer.files[0];
-  if (f && f.type === "application/pdf") processPdfFile(f);
-  else showError("Solte um arquivo .pdf válido.");
-});
-
-/* =========================================================
-   YouTube (somente Gemini — entende a URL nativamente)
-   ========================================================= */
-/* =========================================================
-   YouTube — 1ª tentativa: extrair a legenda diretamente (barato);
-   se falhar, cai automaticamente para o Gemini "assistir" o vídeo.
-   ========================================================= */
-async function tryExtractCaptionMarkdown(apiKey, model, videoUrl){
-  // Passo 1: achar o endereço da faixa de legenda embutido no HTML da página do vídeo
-  const findPrompt = `Esta é a página de um vídeo do YouTube. No código-fonte/HTML dela existe um objeto JSON com o caminho `+
-    `captions.playerCaptionsTracklistRenderer.captionTracks, uma lista de faixas de legenda, cada uma com um campo "baseUrl". `+
-    `Prefira uma faixa que NÃO seja do tipo automática (sem "kind":"asr") no idioma original do vídeo; se não houver nenhuma, use a primeira faixa automática disponível. `+
-    `Responda apenas com o valor cru dessa baseUrl (começando com "https://"), sem aspas, sem explicação, sem markdown. `+
-    `Se não encontrar nenhuma faixa de legenda na página, responda apenas com a palavra SEM_LEGENDA.`;
-  let baseUrl;
-  try{
-    baseUrl = (await callGemini({apiKey, model, prompt: findPrompt + `\n\nURL da página do vídeo: ${videoUrl}`, useUrlContext:true, maxOutputTokens:500})).trim();
-    baseUrl = baseUrl.replace(/^["'`]|["'`]$/g, "").split(/\s+/)[0];
-  }catch(e){ return null; }
-  if (!baseUrl || !/^https?:\/\//.test(baseUrl) || /SEM_LEGENDA/i.test(baseUrl)) return null;
-
-  // Passo 2: buscar o conteúdo dessa faixa e já compilar em Markdown
-  const compilePrompt = `Este endereço contém o conteúdo bruto de uma faixa de legendas do YouTube (formato XML timedtext ou VTT, com marcações de tempo). `+
-    `Compile o texto falado, corrido e organizado em Markdown, com títulos por tema quando fizer sentido, agrupando as frases em parágrafos coerentes (não deixe uma linha por legenda). `+
-    `Insira marcações de tempo aproximadas entre colchetes (ex.: [12:34]) no fluxo natural do texto, no início de cada novo bloco de assunto. `+
-    `Não adicione comentários seus, apenas o conteúdo compilado. Se o endereço não retornar nenhum texto de legenda utilizável, responda apenas com a palavra SEM_LEGENDA.`;
-  let compiled;
-  try{
-    compiled = (await callGemini({apiKey, model, prompt: compilePrompt + `\n\nEndereço: ${baseUrl}`, useUrlContext:true, maxOutputTokens:8192})).trim();
-  }catch(e){ return null; }
-  if (!compiled || compiled.length < 40 || /^SEM_LEGENDA/i.test(compiled)) return null;
-  return compiled;
-}
-
-function ytPrompt(rangeLabel){
-  return `Assista a ${rangeLabel ? "este trecho (" + rangeLabel + ") de" : "este"} vídeo do YouTube e transcreva a fala/conteúdo de forma integral e organizada em Markdown, com títulos por tema quando fizer sentido. `+
-    `Preserve ênfases relevantes (negrito/itálico) quando perceptíveis. Insira marcações de tempo aproximadas entre colchetes (ex.: [12:34], no formato do vídeo inteiro, não relativo ao trecho) no fluxo natural do texto, no início de cada novo bloco de assunto. `+
-    `Não adicione comentários seus: responda apenas com o conteúdo transcrito. Se o trecho pedido estiver além do fim do vídeo, ou não houver conteúdo de fala nele, responda apenas com a palavra FIM_DO_VIDEO.`;
-}
-function fmtHMS(sec){
-  const h = Math.floor(sec/3600), m = Math.floor((sec%3600)/60), s = Math.floor(sec%60);
-  return (h?h+"h":"") + String(m).padStart(2,"0")+"m"+String(s).padStart(2,"0")+"s";
-}
-
-document.getElementById("ytGo").addEventListener("click", async ()=>{
-  clearError(); fullMarkdown = "";
-  const url = document.getElementById("ytUrl").value.trim();
-  const v = cfg.load();
-  window.__escribaFileName = "youtube-transcricao";
-  if (!url){ showError("Informe o endereço do vídeo."); return; }
-  if (!v.geminiKey){ showError("Configure a chave do Gemini em Configurações (⚙) para usar este recurso."); return; }
-
-  const SEGMENT = 1200; // 20 minutos por trecho, usado só se o vídeo inteiro não couber de uma vez
-  const MAX_SEGMENTS = 20; // trava de segurança (~6h40 de vídeo)
-
-  setProgress("Tentando extrair a legenda diretamente…", 10);
-  try{
-    const captionMd = await tryExtractCaptionMarkdown(v.geminiKey, v.geminiModel, url);
-    if (captionMd){
-      fullMarkdown = captionMd;
-      renderOutput();
-      setProgress("Concluído (a partir da legenda — mais rápido e barato).", 100);
-      setTimeout(hideProgress, 1500);
-      return;
-    }
-  }catch(e){ /* segue para o modo de assistir o vídeo */ }
-
-  try{
-    setProgress("Legenda não disponível diretamente — assistindo e transcrevendo o vídeo…", 20);
-    // 1ª tentativa: vídeo inteiro em resolução de mídia baixa (suficiente para fala/legendas, ~3x mais barato em tokens)
-    const md = await callGemini({apiKey:v.geminiKey, model:v.geminiModel, prompt: ytPrompt(), fileUri:url, lowRes:true});
-    fullMarkdown = md.trim();
-    renderOutput();
-    setProgress("Concluído.", 100);
-    setTimeout(hideProgress, 1200);
-  }catch(err){
-    if (!err.tokenLimitExceeded){
-      hideProgress();
-      showError("Falha ao transcrever o vídeo: " + err.message);
-      return;
-    }
-    // Vídeo longo demais para uma única chamada: processa em segmentos de tempo
+    const r=await fetch(url,{redirect:'follow'});
+    if(!r.ok) throw new Error('HTTP '+r.status);
+    html=await r.text();
+    logLine('log','fetch direto ok','ok');
+  }catch(e){
+    logLine('log','bloqueado ('+e.message+') — usando proxy de leitura','w');
+    setProg('src','proxy de leitura…',40);
+    // fallbacks: jina reader (returns clean markdown), then corsproxy
     try{
-      let consecutiveEmpty = 0;
-      for (let seg = 0; seg < MAX_SEGMENTS; seg++){
-        const startSec = seg * SEGMENT, endSec = startSec + SEGMENT;
-        setProgress(`Vídeo longo — transcrevendo trecho ${fmtHMS(startSec)}–${fmtHMS(endSec)}…`, Math.min(95, seg*8));
-        let chunk;
-        try{
-          chunk = await callGemini({
-            apiKey:v.geminiKey, model:v.geminiModel,
-            prompt: ytPrompt(`${fmtHMS(startSec)} a ${fmtHMS(endSec)}`),
-            fileUri:url, lowRes:true,
-            videoRange:{startSec, endSec}
-          });
-        }catch(segErr){
-          consecutiveEmpty++;
-          if (consecutiveEmpty >= 2) break; // provavelmente passou do fim do vídeo
-          continue;
-        }
-        if (!chunk || !chunk.trim() || /^FIM_DO_VIDEO/i.test(chunk.trim())){
-          consecutiveEmpty++;
-          if (consecutiveEmpty >= 2) break;
-          continue;
-        }
-        consecutiveEmpty = 0;
-        fullMarkdown += (fullMarkdown ? "\n\n" : "") + chunk.trim();
-        renderOutput();
-      }
-      if (!fullMarkdown){
-        throw new Error("não foi possível obter conteúdo do vídeo em nenhum trecho.");
-      }
-      setProgress("Concluído (vídeo processado em trechos por ser longo).", 100);
-      setTimeout(hideProgress, 2000);
-    }catch(err2){
-      hideProgress();
-      showError("Falha ao transcrever o vídeo (mesmo dividido em trechos): " + err2.message + " — o texto já obtido continua disponível abaixo.");
+      const r=await fetch('https://r.jina.ai/'+url);
+      if(!r.ok) throw new Error('jina '+r.status);
+      const txt=await r.text();
+      // jina reader devolve cabeçalho "Title: ..." nas primeiras linhas
+      const jt=txt.match(/^Title:\s*(.+)$/m)?.[1]?.trim()||'';
+      setMeta({title:jt.split(/\s+[|–—]\s+/)[0],author:''});
+      setProg('src','pronto',100);
+      logLine('log','extraído via r.jina.ai'+(jt?' — '+jt:''),'ok');
+      setMd(txt,{isRaw:true});switchView('prev');hideProg('src');
+      toast('Link transcrito');return;
+    }catch(e2){
+      logLine('log','jina falhou: '+e2.message,'w');
+      const r=await fetch('https://corsproxy.io/?url='+encodeURIComponent(url));
+      if(!r.ok) throw new Error('proxy '+r.status);
+      html=await r.text();
+      logLine('log','html via corsproxy','ok');
     }
   }
-});
+  setProg('src','convertendo…',75);
+  const md=htmlToMd(html,url);
+  setProg('src','pronto',100);
+  setMd(md,{isRaw:true});switchView('prev');hideProg('src');
+  toast('Link transcrito');
+}
 
+function htmlToMd(html,baseUrl){
+  const doc=new DOMParser().parseFromString(html,'text/html');
+  doc.querySelectorAll('script,style,noscript,nav,footer,header,aside,form,iframe').forEach(n=>n.remove());
+  // pick main-ish content
+  const main=doc.querySelector('article,main,[role=main]')||doc.body;
+  const mc=(sel,attr='content')=>doc.querySelector(sel)?.getAttribute(attr)?.trim()||'';
+  let title=mc('meta[property="og:title"]')||mc('meta[name="twitter:title"]')
+        ||(doc.querySelector('h1')?.textContent||'').trim()||(doc.title||'').trim();
+  let author=mc('meta[name="author"]')||mc('meta[property="article:author"]')
+        ||mc('meta[name="citation_author"]')||(doc.querySelector('[rel=author],.author,.byline')?.textContent||'').trim();
+  if(!author){ // JSON-LD
+    for(const s of doc.querySelectorAll('script[type="application/ld+json"]')){
+      try{
+        const j=JSON.parse(s.textContent);
+        const arr=Array.isArray(j)?j:[j];
+        for(const o of arr){
+          const au=o.author;
+          if(au){author=(typeof au==='string'?au:(Array.isArray(au)?au[0]?.name:au.name))||'';}
+          if(!title&&o.headline) title=o.headline;
+          if(author) break;
+        }
+      }catch{}
+      if(author) break;
+    }
+  }
+  author=author.replace(/^\s*(por|by)\s+/i,'').split(/\s*[,|·]\s*/)[0].trim().slice(0,60);
+  title=title.split(/\s+[|–—]\s+/)[0].trim();  // corta " | Nome do Site"
+  setMeta({title,author});
+  if(author||title) logLine('log','metadados: '+[author,title].filter(Boolean).join(' — '));
+  let md=td.turndown(main.innerHTML);
+  md=cleanMd(md);
+  return (title?('# '+title+'\n\n'):'')+md;
+}
+
+async function handleFile(file){
+  clearLog('log');hideProg('src');
+  const name=file.name.toLowerCase();
+  logLine('log','lendo '+file.name+' ('+(file.size/1024|0)+' KB)');
+  try{
+    if(name.endsWith('.pdf')) await extractPdf(file);
+    else if(name.endsWith('.docx')) await extractDocx(file);
+    else if(name.endsWith('.doc')) await extractDoc(file);
+    else if(name.endsWith('.epub')) await extractEpub(file);
+    else if(name.endsWith('.html')||name.endsWith('.htm')) await extractHtml(file);
+    else if(name.endsWith('.md')||name.endsWith('.markdown')) await extractText(file,true);
+    else await extractText(file,false);
+  }catch(e){
+    logLine('log','falha: '+e.message,'e');toast('Erro na extração');hideProg('src');
+  }
+}
+
+async function extractPdf(file){
+  const buf=await file.arrayBuffer();
+  const pdf=await pdfjsLib.getDocument({data:buf}).promise;
+  try{
+    const md=await pdf.getMetadata();
+    const info=md?.info||{};
+    let t=(info.Title||'').trim(), a=(info.Author||'').trim();
+    if(!t) t=file.name.replace(/\.pdf$/i,'');
+    setMeta({title:t,author:a});
+    if(t||a) logLine('log','metadados: '+[a,t].filter(Boolean).join(' — '));
+  }catch{ setMeta({title:file.name.replace(/\.pdf$/i,''),author:''}); }
+  const N=pdf.numPages;let out=[];
+  for(let i=1;i<=N;i++){
+    setProg('src','página '+i+'/'+N,(i/N)*100);
+    const page=await pdf.getPage(i);
+    const tc=await page.getTextContent();
+    let last=0,txt='';
+    tc.items.forEach(it=>{
+      const y=it.transform[5];
+      if(last && Math.abs(last-y)>4) txt+='\n';
+      txt+=it.str+(it.hasEOL?'\n':' ');last=y;
+    });
+    out.push('[p. '+i+']\n'+txt.trim());
+  }
+  hideProg('src');
+  setMd(cleanMd(out.join('\n\n')),{isRaw:true});switchView('prev');
+  logLine('log',N+' páginas extraídas','ok');toast('PDF transcrito');
+}
+
+async function extractDocx(file){
+  setProg('src','convertendo docx…',40);
+  const buf=await file.arrayBuffer();
+  try{
+    const zip=await JSZip.loadAsync(buf);
+    const core=zip.file('docProps/core.xml');
+    let t='',a='';
+    if(core){
+      const xml=await core.async('text');
+      t=(xml.match(/<dc:title>([\s\S]*?)<\/dc:title>/)?.[1]||'').trim();
+      a=(xml.match(/<dc:creator>([\s\S]*?)<\/dc:creator>/)?.[1]||'').trim();
+    }
+    if(!t) t=file.name.replace(/\.docx$/i,'');
+    setMeta({title:t,author:a});
+    if(a||t) logLine('log','metadados: '+[a,t].filter(Boolean).join(' — '));
+  }catch{ setMeta({title:file.name.replace(/\.docx$/i,''),author:''}); }
+  const res=await mammoth.convertToHtml({arrayBuffer:buf});
+  const md=cleanMd(td.turndown(res.value));
+  setProg('src','pronto',100);hideProg('src');
+  setMd(md,{isRaw:true});switchView('prev');
+  if(res.messages?.length) logLine('log',res.messages.length+' avisos de conversão','w');
+  logLine('log','docx convertido','ok');toast('DOCX transcrito');
+}
+
+async function extractDoc(file){
+  setProg('src','.doc best-effort…',40);
+  setMeta({title:file.name.replace(/\.doc$/i,''),author:''});
+  const buf=await file.arrayBuffer();
+  // try mammoth (works for some), else naive text scrape
+  try{
+    const res=await mammoth.convertToHtml({arrayBuffer:buf});
+    if(res.value && res.value.replace(/<[^>]+>/g,'').trim().length>40){
+      hideProg('src');setMd(cleanMd(td.turndown(res.value)),{isRaw:true});switchView('prev');
+      logLine('log','.doc lido via mammoth','ok');toast('DOC transcrito');return;
+    }
+    throw new Error('vazio');
+  }catch{
+    const bytes=new Uint8Array(buf);let s='';
+    for(let i=0;i<bytes.length;i++){const c=bytes[i];if((c>=32&&c<127)||c===10||c===13)s+=String.fromCharCode(c);else s+=' ';}
+    const txt=s.replace(/[ \t]{3,}/g,' ').replace(/(.)\1{5,}/g,'').split('\n').map(l=>l.trim()).filter(l=>l.length>3).join('\n');
+    hideProg('src');
+    if(txt.trim().length<40) throw new Error('não foi possível extrair texto legível deste .doc');
+    setMd(cleanMd(txt),{isRaw:true});switchView('prev');
+    logLine('log','.doc via scrape bruto (revise)','w');toast('DOC (parcial)');
+  }
+}
+
+async function extractEpub(file){
+  setProg('src','abrindo epub…',20);
+  const zip=await JSZip.loadAsync(await file.arrayBuffer());
+  // find spine order via content.opf
+  let opfPath=null;
+  const container=zip.file('META-INF/container.xml');
+  if(container){
+    const xml=await container.async('text');
+    opfPath=xml.match(/full-path="([^"]+)"/)?.[1];
+  }
+  let files=[];
+  if(opfPath && zip.file(opfPath)){
+    const opf=await zip.file(opfPath).async('text');
+    const base=opfPath.includes('/')?opfPath.replace(/[^/]+$/,''):'';
+    const doc=new DOMParser().parseFromString(opf,'text/xml');
+    const gx=(tag)=>{
+      const n=doc.getElementsByTagName('dc:'+tag)[0]||doc.getElementsByTagName(tag)[0];
+      return n?n.textContent.trim():'';
+    };
+    const t=gx('title')||file.name.replace(/\.epub$/i,''), a=gx('creator');
+    setMeta({title:t,author:a});
+    if(a||t) logLine('log','metadados: '+[a,t].filter(Boolean).join(' — '));
+    const manifest={};
+    doc.querySelectorAll('manifest item').forEach(it=>manifest[it.getAttribute('id')]=it.getAttribute('href'));
+    doc.querySelectorAll('spine itemref').forEach(ir=>{const h=manifest[ir.getAttribute('idref')];if(h)files.push(base+h);});
+  }
+  if(!meta.title) setMeta({title:file.name.replace(/\.epub$/i,''),author:''});
+  if(!files.length){files=Object.keys(zip.files).filter(f=>/\.x?html?$/i.test(f)).sort();}
+  let out=[];let i=0;
+  for(const f of files){
+    i++;setProg('src','capítulo '+i+'/'+files.length,(i/files.length)*100);
+    const entry=zip.file(f);if(!entry)continue;
+    const html=await entry.async('text');
+    const d=new DOMParser().parseFromString(html,'text/html');
+    d.querySelectorAll('script,style').forEach(n=>n.remove());
+    const m=td.turndown((d.body||d).innerHTML).trim();
+    if(m) out.push(m);
+  }
+  hideProg('src');
+  setMd(cleanMd(out.join('\n\n---\n\n')),{isRaw:true});switchView('prev');
+  logLine('log',files.length+' seções extraídas','ok');toast('EPUB transcrito');
+}
+
+async function extractHtml(file){
+  setProg('src','convertendo html…',50);
+  const html=await file.text();hideProg('src');
+  setMd(htmlToMd(html),{isRaw:true});switchView('prev');
+  logLine('log','html convertido','ok');toast('HTML transcrito');
+}
+
+async function extractText(file,isMd){
+  setMeta({title:file.name.replace(/\.(txt|md|markdown)$/i,''),author:''});
+  const t=await file.text();
+  setMd(isMd?t:('```\n'+t+'\n```').replace(/^```\n([\s\S]*)\n```$/,'$1'),{isRaw:true});
+  switchView(isMd?'prev':'edit');
+  logLine('log',(isMd?'markdown':'texto')+' carregado','ok');toast('Arquivo carregado');
+}
+
+function cleanMd(md){
+  return md
+    .replace(/\r/g,'')
+    .replace(/[ \t]+\n/g,'\n')
+    .replace(/\n{4,}/g,'\n\n\n')
+    .replace(/&nbsp;/g,' ')
+    .trim();
+}
 
 /* =========================================================
-   Site (somente Gemini — url_context faz a busca no servidor)
+   AI ORGANIZATION (BYOK, direct browser → provider)
    ========================================================= */
-document.getElementById("siteGo").addEventListener("click", async ()=>{
-  clearError(); fullMarkdown = "";
-  const url = document.getElementById("siteUrl").value.trim();
-  const v = cfg.load();
-  window.__escribaFileName = "site-transcricao";
-  if (!url){ showError("Informe o endereço da página."); return; }
-  if (!v.geminiKey){ showError("Configure a chave do Gemini em Configurações (⚙) para usar este recurso."); return; }
-  try{
-    setProgress("Buscando e organizando o conteúdo da página…", 30);
-    const prompt = `Acesse o conteúdo da URL ${url} e transcreva/organize o texto integral da página em Markdown, preservando a estrutura original: títulos, listas, tabelas, citações e ênfases (negrito/itálico). `+
-      `Ignore menus de navegação, propaganda e rodapés de site não relacionados ao conteúdo principal. `+
-      `Não adicione comentários seus: responda apenas com o conteúdo organizado.`;
-    const md = await callGemini({apiKey:v.geminiKey, model:v.geminiModel, prompt, useUrlContext:true});
-    fullMarkdown = md.trim();
-    renderOutput();
-    setProgress("Concluído.", 100);
-    setTimeout(hideProgress, 1200);
-  }catch(err){
-    hideProgress();
-    showError("Falha ao transcrever a página: " + err.message);
+const SYS_PROMPT = `You are a meticulous text-structuring editor. You reorganize raw transcribed text into clean Markdown WITHOUT changing, adding, summarizing or removing the actual content/meaning.
+Rules:
+- Detect the document's language and respond in that SAME language.
+- PRESERVE every page marker exactly in the form [p. N]; keep them inline where they occur.
+- Remove repeated running headers/footers, page-number noise, watermarks.
+- Rejoin hyphenated words split across line breaks; rejoin paragraphs broken mid-sentence.
+- Apply a sensible hierarchy of Markdown headings (#, ##, ###) based on the text's own structure.
+- Apply **bold** and *italic* where clearly warranted (defined terms, emphasis already implied).
+- Convert quotations/epigraphs into > blockquotes.
+- Format footnotes as Markdown ([^1] references + definitions).
+- Preserve lists, tables, code blocks, and math/formulas faithfully.
+- Do NOT wrap your answer in code fences. Output ONLY the resulting Markdown.`;
+
+async function callProvider(id,key,text){
+  const p=PROVIDERS[id];
+  const user='Reorganize the following transcribed text into clean Markdown per the rules:\n\n'+text;
+  if(id==='gemini'){
+    const url=`https://generativelanguage.googleapis.com/v1beta/models/${p.model}:generateContent?key=${key}`;
+    const r=await fetch(url,{method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({systemInstruction:{parts:[{text:SYS_PROMPT}]},contents:[{role:'user',parts:[{text:user}]}],generationConfig:{temperature:0.2}})});
+    const j=await r.json();
+    if(!r.ok) throw new Error(j.error?.message||('HTTP '+r.status));
+    return j.candidates?.[0]?.content?.parts?.[0]?.text||'';
   }
-});
+  // OpenAI-compatible chat completions for the rest
+  const endpoints={
+    groq:'https://api.groq.com/openai/v1/chat/completions',
+    openrouter:'https://openrouter.ai/api/v1/chat/completions',
+    mistral:'https://api.mistral.ai/v1/chat/completions',
+    cerebras:'https://api.cerebras.ai/v1/chat/completions',
+    kimi:'https://api.moonshot.ai/v1/chat/completions',
+  };
+  const r=await fetch(endpoints[id],{method:'POST',
+    headers:{'Content-Type':'application/json','Authorization':'Bearer '+key},
+    body:JSON.stringify({model:p.model,temperature:0.2,messages:[{role:'system',content:SYS_PROMPT},{role:'user',content:user}]})});
+  const j=await r.json();
+  if(!r.ok) throw new Error(j.error?.message||j.error||('HTTP '+r.status));
+  return j.choices?.[0]?.message?.content||'';
+}
+
+// split large text into page-aware chunks
+function chunkText(md,maxChars=9000){
+  if(md.length<=maxChars) return [md];
+  const parts=[];const paras=md.split(/\n\n+/);let cur='';
+  for(const para of paras){
+    if((cur+'\n\n'+para).length>maxChars && cur){parts.push(cur);cur=para;}
+    else cur=cur?cur+'\n\n'+para:para;
+  }
+  if(cur)parts.push(cur);return parts;
+}
+
+async function organize(fromRaw){
+  const source=fromRaw?rawMd:currentMd;
+  if(!source.trim()){toast('Nada para organizar');return;}
+  const active=cfg.order.filter(id=>cfg.keys[id]&&cfg.keys[id].trim());
+  if(!active.length){toast('Configure ao menos uma chave');openKeys();return;}
+
+  clearLog('aiLog');
+  const chunks=chunkText(source);
+  const results=[];
+  el('btnOrg').disabled=true;el('btnRedo').disabled=true;
+  for(let c=0;c<chunks.length;c++){
+    setProg('ai','organizando parte '+(c+1)+'/'+chunks.length,(c/chunks.length)*100);
+    let done=false;
+    for(const id of active){
+      try{
+        logLine('aiLog','parte '+(c+1)+' → '+PROVIDERS[id].name+'…');
+        const out=await callProvider(id,cfg.keys[id].trim(),chunks[c]);
+        if(!out.trim()) throw new Error('resposta vazia');
+        results.push(out.trim());done=true;
+        logLine('aiLog',PROVIDERS[id].name+' ok','ok');break;
+      }catch(e){
+        logLine('aiLog',PROVIDERS[id].name+' falhou: '+e.message,'w');
+      }
+    }
+    if(!done){
+      logLine('aiLog','todos os provedores falharam na parte '+(c+1),'e');
+      setProg('ai','falhou',100);
+      el('btnOrg').disabled=false;el('btnRedo').disabled=!(rawMd.trim());
+      toast('Falha: verifique chaves/cotas');return;
+    }
+  }
+  setProg('ai','concluído',100);
+  setMd(results.join('\n\n'));switchView('prev');
+  el('btnOrg').disabled=false;el('btnRedo').disabled=!(rawMd.trim());
+  setTimeout(()=>hideProg('ai'),1200);
+  toast('Texto organizado');
+}
+
+/* =========================================================
+   KEYS MODAL
+   ========================================================= */
+function renderProvList(){
+  const list=el('provList');list.innerHTML='';
+  cfg.order.forEach((id,idx)=>{
+    const p=PROVIDERS[id];const has=cfg.keys[id]&&cfg.keys[id].trim();
+    const div=document.createElement('div');div.className='prov';
+    div.innerHTML=`
+      <div class="prov-h">
+        <div class="arrows">
+          <button data-up="${id}" ${idx===0?'disabled':''}>▲</button>
+          <button data-dn="${id}" ${idx===cfg.order.length-1?'disabled':''}>▼</button>
+        </div>
+        <div>
+          <div class="nm">${p.name} <span class="md">${p.model.split('/').pop()}</span></div>
+        </div>
+        <span class="tg ${has?'set':'unset'}">${has?'#'+(idx+1)+' · ativa':'sem chave'}</span>
+      </div>
+      <div class="prov-b">
+        <div class="kk">
+          <input type="password" placeholder="cole a API key…" data-key="${id}" value="${cfg.keys[id]||''}" />
+        </div>
+        <div class="note">Chave grátis: <a href="https://${p.hint}" target="_blank" rel="noopener">${p.hint}</a></div>
+      </div>`;
+    list.appendChild(div);
+  });
+  list.querySelectorAll('[data-key]').forEach(inp=>inp.oninput=()=>{cfg.keys[inp.dataset.key]=inp.value;saveKeys(cfg);const tg=inp.closest('.prov').querySelector('.tg');const has=inp.value.trim();tg.className='tg '+(has?'set':'unset');tg.textContent=has?'ativa':'sem chave';});
+  list.querySelectorAll('[data-up]').forEach(b=>b.onclick=()=>moveProv(b.dataset.up,-1));
+  list.querySelectorAll('[data-dn]').forEach(b=>b.onclick=()=>moveProv(b.dataset.dn,1));
+}
+function moveProv(id,dir){
+  const i=cfg.order.indexOf(id);const j=i+dir;
+  if(j<0||j>=cfg.order.length)return;
+  [cfg.order[i],cfg.order[j]]=[cfg.order[j],cfg.order[i]];
+  saveKeys(cfg);renderProvList();
+}
+function openKeys(){renderProvList();el('keysModal').classList.add('on');}
+el('btnKeys').onclick=openKeys;
+el('keysX').onclick=()=>el('keysModal').classList.remove('on');
+el('keysModal').onclick=(e)=>{if(e.target===el('keysModal'))el('keysModal').classList.remove('on');};
+
+/* =========================================================
+   WIRING
+   ========================================================= */
+el('btnFetch').onclick=()=>{const u=el('urlInput').value.trim();if(!u){toast('Cole uma URL');return;}fetchUrl(u.startsWith('http')?u:'https://'+u).catch(e=>{logLine('log',e.message,'e');hideProg('src');toast('Erro no link');});};
+el('urlInput').onkeydown=e=>{if(e.key==='Enter')el('btnFetch').click();};
+
+el('drop').onclick=()=>el('fileInput').click();
+el('fileInput').onchange=e=>{if(e.target.files[0])handleFile(e.target.files[0]);};
+['dragover','dragenter'].forEach(ev=>el('drop').addEventListener(ev,e=>{e.preventDefault();el('drop').classList.add('drag');}));
+['dragleave','drop'].forEach(ev=>el('drop').addEventListener(ev,e=>{e.preventDefault();el('drop').classList.remove('drag');}));
+el('drop').addEventListener('drop',e=>{if(e.dataTransfer.files[0])handleFile(e.dataTransfer.files[0]);});
+
+el('btnOrg').onclick=()=>organize(false);
+el('btnRedo').onclick=()=>organize(true);
+
+el('mAuthor').oninput=()=>{el('fnameHint').textContent=buildFilename();};
+el('mTitle').oninput =()=>{el('fnameHint').textContent=buildFilename();};
+
+el('btnCopy').onclick=async()=>{await navigator.clipboard.writeText(el('editor').value);toast('Copiado');};
+el('btnDl').onclick=downloadMd;
+function downloadMd(){
+  const blob=new Blob([el('editor').value],{type:'text/markdown'});
+  const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+  const fn=buildFilename();
+  a.download=fn;a.click();URL.revokeObjectURL(a.href);toast('Baixado: '+fn);
+}
+document.addEventListener('keydown',e=>{if((e.ctrlKey||e.metaKey)&&e.key==='s'){e.preventDefault();if(!el('btnDl').disabled)downloadMd();}});
+
+switchView('prev');
 </script>
 </body>
 </html>
